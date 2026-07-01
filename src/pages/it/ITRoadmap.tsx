@@ -24,6 +24,7 @@ import { extractErrorMessage } from '@/lib/extractErrorMessage';
 import { useFdrProjects, usePatchFdrProject, type FdrRoadmapProject, type FdrProjectPatch } from '@/hooks/useFdrProjects';
 import { FdrImportExport } from '@/components/it/FdrImportExport';
 import { FdrHistorySheet } from '@/components/it/FdrHistorySheet';
+import { FdrScenarioMatrix } from '@/components/it/FdrScenarioMatrix';
 import { useFdrSettings, useFdrProfils } from '@/hooks/useFdrSettings';
 import { useITActivites } from '@/hooks/useITActivites';
 import {
@@ -145,6 +146,7 @@ function applyRoadmapOverrides(projects: FdrRoadmapProject[], overrides: Project
     if (!o) return p;
     return {
       ...p,
+      sur_feuille_de_route: o.sur_feuille_de_route !== undefined ? o.sur_feuille_de_route : p.sur_feuille_de_route,
       date_kickoff: o.date_kickoff !== undefined ? o.date_kickoff : p.date_kickoff,
       date_mep_saisie: o.date_mep_saisie !== undefined ? o.date_mep_saisie : p.date_mep_saisie,
       delai_projete_mois: o.delai_projete_mois !== undefined ? o.delai_projete_mois : p.delai_projete_mois,
@@ -464,6 +466,15 @@ function RoadmapContent() {
     });
   }, [previewProjects, search, fCategorie, fActivite, fPilier, fStatut, fProfil, onlyWithDays]);
 
+  // ---- Projets réels visibles (pour la matrice comparateur de scénarios) ----
+  // On repart des projets RÉELS (pas du preview scénario) : chaque colonne de la
+  // matrice applique ses propres overrides à cette base commune.
+  const projectsById = useMemo(() => new Map(projects.map(p => [p.id, p])), [projects]);
+  const visibleRealProjects = useMemo(
+    () => filtered.map(f => projectsById.get(f.id)).filter(Boolean) as FdrRoadmapProject[],
+    [filtered, projectsById],
+  );
+
   // ---- Clé de groupe selon le mode ----
   const groupKeyOf = useCallback((p: FdrRoadmapProject): string => {
     switch (groupBy) {
@@ -649,6 +660,9 @@ function RoadmapContent() {
   // ---- Actions menu contextuel ----
   const toggleFdr = (p: FdrRoadmapProject) => {
     const nv = !p.sur_feuille_de_route;
+    // Mode scénario : inclusion propre au scénario (override non destructif),
+    // ne touche ni le réel ni les autres scénarios.
+    if (scenarioMode) { setOverride(p.id, { sur_feuille_de_route: nv }); return; }
     applyPatch({
       label: nv ? `Restauration ${p.code}` : `Retrait FDR ${p.code}`,
       redo: { projectId: p.id, patch: { sur_feuille_de_route: nv }, action: nv ? 'restore_fdr' : 'remove_fdr', changes: [{ field: 'sur_feuille_de_route', oldValue: p.sur_feuille_de_route, newValue: nv }] },
@@ -993,6 +1007,17 @@ function RoadmapContent() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Comparateur de scénarios (inclusion / démarrage / ST par projet × scénario) */}
+      <FdrScenarioMatrix
+        projects={visibleRealProjects}
+        scenarios={scenarios}
+        activeSel={scenarioSel}
+        activeName={scenarioName}
+        activeOverrides={ovArray}
+        onSetOverride={setOverride}
+        onToggleRealFdr={toggleFdr}
+      />
 
       {/* Légende */}
       <div className="flex flex-wrap gap-4 text-[11px] text-muted-foreground px-1">

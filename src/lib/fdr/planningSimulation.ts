@@ -108,6 +108,8 @@ export function applyProjectOverrides(
     if (!o) return p;
     return {
       ...p,
+      sur_feuille_de_route:
+        o.sur_feuille_de_route !== undefined ? o.sur_feuille_de_route : p.sur_feuille_de_route,
       date_kickoff: o.date_kickoff !== undefined ? o.date_kickoff : p.date_kickoff,
       date_mep_saisie: o.date_mep_saisie !== undefined ? o.date_mep_saisie : p.date_mep_saisie,
       delai_projete_mois: o.delai_projete_mois !== undefined ? o.delai_projete_mois : p.delai_projete_mois,

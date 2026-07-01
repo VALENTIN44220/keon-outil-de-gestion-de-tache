@@ -19,6 +19,8 @@ export interface SimulatedHire {
  */
 export interface ProjectOverride {
   it_project_id: string;
+  /** Inclusion dans la feuille de route, propre au scénario (true = pris en compte). */
+  sur_feuille_de_route?: boolean;
   date_kickoff?: string | null;          // 'YYYY-MM-DD' ou 'YYYY-MM'
   date_mep_saisie?: string | null;       // idem
   /** Durée build (mois) — décalage/étirement depuis la feuille de route. */
