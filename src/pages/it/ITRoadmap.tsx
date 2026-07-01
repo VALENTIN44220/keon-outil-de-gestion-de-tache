@@ -34,7 +34,7 @@ import {
   useFdrHireScenarios, type ProjectOverride, type SimulatedHire,
   type ScenarioAssumptions,
 } from '@/hooks/useFdrHireScenarios';
-import { applyHires } from '@/lib/fdr/planningSimulation';
+import { applyHires, peakOver } from '@/lib/fdr/planningSimulation';
 import { useViewPreferences } from '@/hooks/useViewPreferences';
 import {
   computeCapacityMatrix, computeProjectMonthLoads, generateHorizon, getMepRetenue, toYM, addMonths,
@@ -591,6 +591,27 @@ function RoadmapContent() {
   );
   const [chargeOpen, setChargeOpen] = useState(true);
 
+  // En groupement PAR PROFIL, la ligne d'en-tête de groupe affiche la DEMANDE sur
+  // ce profil (issue de la matrice ajustée) pour rester alignée avec la heatmap
+  // « Demande vs capacité » et le Plan de charge — et non la somme des charges
+  // totales des projets pilotés par ce profil (qui mélange tous les profils).
+  const profilCodeByNom = useMemo(() => new Map(profils.map(p => [p.nom, p.code])), [profils]);
+  const groupPeriodValues = useCallback(
+    (label: string | null, items: FdrRoadmapProject[]): Record<string, number> => {
+      if (groupBy === 'profil' && label && adjustedMatrix) {
+        const code = profilCodeByNom.get(label);
+        const row = code ? adjustedMatrix.by_profil[code] : undefined;
+        if (row) {
+          const out: Record<string, number> = {};
+          for (const per of periods) out[per.key] = Math.round(peakOver(row.demande, per.months).value * 10) / 10;
+          return out;
+        }
+      }
+      return groupPeriodSums(items);
+    },
+    [groupBy, adjustedMatrix, profilCodeByNom, periods, groupPeriodSums],
+  );
+
   // ---- Handlers drag ----
   const onBarPointerDown = (e: React.PointerEvent, p: FdrRoadmapProject, mode: 'move' | 'resize') => {
     if (e.button !== 0) return; // clic gauche uniquement (clic droit = menu)
@@ -975,9 +996,9 @@ function RoadmapContent() {
                         {isCollapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
                         {group.label} <span className="font-normal normal-case">({group.items.length})</span>
                       </div>
-                      {/* Pic de charge du groupe par colonne */}
+                      {/* Pic de charge du groupe par colonne (par profil = demande sur le profil) */}
                       {(() => {
-                        const sums = groupPeriodSums(group.items);
+                        const sums = groupPeriodValues(group.label, group.items);
                         return periods.map(per => (
                           <div key={per.key} style={{ width: MONTH_W }} className="shrink-0 text-center text-[10px] py-1 tabular-nums border-l border-border/20 text-violet-700 font-medium">
                             {sums[per.key] > 0 ? sums[per.key] : ''}
