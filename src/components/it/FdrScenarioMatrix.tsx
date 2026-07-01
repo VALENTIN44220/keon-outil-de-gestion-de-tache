@@ -51,7 +51,7 @@ function fmtStart(ym: string | null): string {
 export function FdrScenarioMatrix({
   projects, scenarios, activeSel, activeName, activeOverrides, onSetOverride, onToggleRealFdr,
 }: FdrScenarioMatrixProps) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
 
   const activeMap = useMemo(
     () => new Map(activeOverrides.map(o => [o.it_project_id, o])),
