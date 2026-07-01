@@ -25,6 +25,9 @@ import { useFdrProjects, usePatchFdrProject, type FdrRoadmapProject, type FdrPro
 import { FdrImportExport } from '@/components/it/FdrImportExport';
 import { FdrHistorySheet } from '@/components/it/FdrHistorySheet';
 import { FdrScenarioMatrix } from '@/components/it/FdrScenarioMatrix';
+import {
+  HeatmapCard, SousEffectifParProfilCard, CascadeCard, SparklinesCard,
+} from '@/components/it/FdrChargeVisuals';
 import { useFdrSettings, useFdrProfils } from '@/hooks/useFdrSettings';
 import { useITActivites } from '@/hooks/useITActivites';
 import {
@@ -567,16 +570,26 @@ function RoadmapContent() {
     return out;
   }, [periods, engineSettings]);
 
-  // ---- Cascade sous-effectif : sur les projets FILTRÉS (contexte de filtre),
-  // + renforts/externalisation du scénario actif. ----
-  const cascade = useMemo(() => {
-    if (!engineSettings) return null;
-    const base = computeCapacityMatrix(filtered, engineSettings);
-    if (scenarioMode && hires.length > 0) {
-      return applyHires(base, hires, engineSettings.jours_productifs_mois).cascade;
-    }
-    return base.rsi_cascade;
-  }, [filtered, engineSettings, scenarioMode, hires]);
+  // ---- Matrice de charge ajustée : projets FILTRÉS (contexte de filtre) +
+  // renforts/externalisation du scénario actif. Sert à la cascade ET aux visuels. ----
+  const baseMatrix = useMemo(
+    () => (engineSettings ? computeCapacityMatrix(filtered, engineSettings) : null),
+    [filtered, engineSettings],
+  );
+  const adjustedMatrix = useMemo(
+    () => (baseMatrix && engineSettings
+      ? applyHires(baseMatrix, scenarioMode ? hires : [], engineSettings.jours_productifs_mois)
+      : null),
+    [baseMatrix, engineSettings, scenarioMode, hires],
+  );
+  const cascade = adjustedMatrix?.cascade ?? null;
+
+  // Profils actifs (pour les visuels de plan de charge)
+  const activeProfils = useMemo(
+    () => profils.filter(p => p.actif).map(p => ({ code: p.code, nom: p.nom, capacite_j_mois: p.capacite_j_mois })),
+    [profils],
+  );
+  const [chargeOpen, setChargeOpen] = useState(true);
 
   // ---- Handlers drag ----
   const onBarPointerDown = (e: React.PointerEvent, p: FdrRoadmapProject, mode: 'move' | 'resize') => {
@@ -1055,6 +1068,42 @@ function RoadmapContent() {
         onSetOverride={setOverride}
         onToggleRealFdr={toggleFdr}
       />
+
+      {/* Visuels de plan de charge (impact du scénario / des décalages) */}
+      {adjustedMatrix && engineSettings && (
+        <Card className="border-border/50">
+          <button
+            type="button"
+            onClick={() => setChargeOpen(o => !o)}
+            className="w-full flex items-center gap-2 p-3 text-left hover:bg-muted/30"
+          >
+            {chargeOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+            <MapIcon className="h-4 w-4 text-violet-600" />
+            <span className="text-sm font-medium">Plan de charge — impact du scénario</span>
+            <span className="ml-auto text-[11px] text-muted-foreground">
+              demande vs capacité · sous-effectif · cascade RSI · courbes
+            </span>
+          </button>
+          {chargeOpen && (
+            <CardContent className="p-3 space-y-4">
+              <HeatmapCard adjusted={adjustedMatrix} activeProfils={activeProfils} periods={periods} />
+              <SousEffectifParProfilCard
+                adjusted={adjustedMatrix}
+                activeProfils={activeProfils}
+                periods={periods}
+                joursProductifs={engineSettings.jours_productifs_mois}
+              />
+              <CascadeCard
+                adjusted={adjustedMatrix}
+                baseline={baseMatrix?.rsi_cascade ?? []}
+                periods={periods}
+                hasHires={scenarioMode && hires.length > 0}
+              />
+              <SparklinesCard adjusted={adjustedMatrix} activeProfils={activeProfils} months={months} />
+            </CardContent>
+          )}
+        </Card>
+      )}
 
       {/* Légende */}
       <div className="flex flex-wrap gap-4 text-[11px] text-muted-foreground px-1">
