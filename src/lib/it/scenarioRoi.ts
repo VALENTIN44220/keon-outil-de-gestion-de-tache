@@ -18,6 +18,11 @@ export const DEFAULT_ASSUMPTIONS: Required<ScenarioAssumptions> = {
   tjm_st: 500,
 };
 
+/** Heures par jour (pour dériver un taux horaire depuis le TJM €/j). */
+const HEURES_PAR_JOUR = 8;
+/** Heures travaillées par an et par ETP (38,5 h/sem) — base du coût annuel d'une embauche. */
+export const HEURES_ANNUELLES_ETP = 1767;
+
 export interface ScenarioRoi {
   /** Gain annuel cumulé des projets tenables (€/an). */
   gain_annuel_eur: number;
@@ -99,7 +104,14 @@ export function computeScenarioRoi(
       // ST générique valorisée au TJM × jours productifs × 12 mois (annualisé)
       cout_st_eur += etp * joursProductifsMois * 12 * tjmSt;
     } else {
-      cout_embauches_eur += etp * coutEtp;
+      // Embauche : coût annuel chargé = taux horaire (TJM €/j ÷ 8) × heures/an.
+      // Le TJM vient du référentiel Params FDR (par profil). Ex. 344 €/j → 43 €/h
+      // × 1767 h = 75 981 €/an. Fallback sur le forfait si le profil n'a pas de TJM.
+      const tjmJour = tjmMap[h.profil_code] ?? 0;
+      const coutAnnuelEtp = tjmJour > 0
+        ? (tjmJour / HEURES_PAR_JOUR) * HEURES_ANNUELLES_ETP
+        : coutEtp;
+      cout_embauches_eur += etp * coutAnnuelEtp;
     }
   }
 
