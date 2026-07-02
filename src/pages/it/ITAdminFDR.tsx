@@ -75,23 +75,35 @@ function GlobalSettingsCard() {
   const [echeanceStd, setEcheanceStd] = useState('');
   const [horizonDebut, setHorizonDebut] = useState('');
   const [horizonDuree, setHorizonDuree] = useState('');
+  const [seuilSE, setSeuilSE] = useState('');
+  const [partRisque, setPartRisque] = useState(''); // en %
 
   const startEdit = () => {
     setJoursP(String(settings?.jours_productifs_mois ?? 18));
     setEcheanceStd(settings?.echeance_standard_permanentes?.slice(0, 10) ?? '2030-12-31');
     setHorizonDebut(settings?.horizon_debut?.slice(0, 10) ?? '2026-06-01');
     setHorizonDuree(String(settings?.horizon_duree_mois ?? 19));
+    setSeuilSE(String((settings as any)?.seuil_sous_effectif_jours ?? 5));
+    setPartRisque(String(Math.round(((settings as any)?.part_duree_risque ?? 0.25) * 100)));
     setEditing(true);
   };
 
   const save = async () => {
     const j = parseInt(joursP);
     const d = parseInt(horizonDuree);
+    const seuil = parseFloat(seuilSE);
+    const partPct = parseFloat(partRisque);
     if (isNaN(j) || j < 1 || j > 31) {
       toast({ title: 'Jours productifs invalides (1–31)', variant: 'destructive' }); return;
     }
     if (isNaN(d) || d < 1) {
       toast({ title: 'Durée horizon invalide', variant: 'destructive' }); return;
+    }
+    if (isNaN(seuil) || seuil < 0) {
+      toast({ title: 'Seuil sous-effectif invalide', variant: 'destructive' }); return;
+    }
+    if (isNaN(partPct) || partPct < 0 || partPct > 100) {
+      toast({ title: 'Part de durée invalide (0–100 %)', variant: 'destructive' }); return;
     }
     try {
       await update.mutateAsync({
@@ -99,7 +111,9 @@ function GlobalSettingsCard() {
         echeance_standard_permanentes: echeanceStd,
         horizon_debut: horizonDebut,
         horizon_duree_mois: d,
-      });
+        seuil_sous_effectif_jours: seuil,
+        part_duree_risque: partPct / 100,
+      } as any);
       toast({ title: 'Paramètres mis à jour' });
       setEditing(false);
     } catch (e) {
@@ -143,6 +157,22 @@ function GlobalSettingsCard() {
               <Input id="horizonDuree" type="number" min={1} max={60} value={horizonDuree}
                 onChange={e => setHorizonDuree(e.target.value)} className="w-40" />
             </div>
+            <div className="space-y-1 border-t pt-3">
+              <Label htmlFor="seuilSE">Seuil de sous-effectif « à risque » (j/mois)</Label>
+              <Input id="seuilSE" type="number" min={0} step={0.5} value={seuilSE}
+                onChange={e => setSeuilSE(e.target.value)} className="w-40" />
+              <p className="text-[11px] text-muted-foreground">
+                Un mois compte « à risque » si le sous-effectif d'un profil mobilisé dépasse ce seuil (5 j = 25 % d'un ETP).
+              </p>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="partRisque">Part de la durée du projet en risque (%)</Label>
+              <Input id="partRisque" type="number" min={0} max={100} value={partRisque}
+                onChange={e => setPartRisque(e.target.value)} className="w-40" />
+              <p className="text-[11px] text-muted-foreground">
+                Le projet est classé « à risque » si ces mois dépassent ce % de sa durée (déf. 25 %).
+              </p>
+            </div>
             <div className="flex gap-2 pt-2">
               <Button onClick={save} disabled={update.isPending} className="gap-2">
                 {update.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
@@ -162,6 +192,8 @@ function GlobalSettingsCard() {
                   <ParamRow label="Échéance standard (tâches permanentes)" value={fmtDate(settings?.echeance_standard_permanentes)} />
                   <ParamRow label="Début de l'horizon" value={fmtDate(settings?.horizon_debut)} />
                   <ParamRow label="Durée de l'horizon" value={`${settings?.horizon_duree_mois ?? 19} mois`} />
+                  <ParamRow label="Seuil sous-effectif « à risque »" value={`> ${(settings as any)?.seuil_sous_effectif_jours ?? 5} j/mois`} />
+                  <ParamRow label="Part de la durée en risque" value={`> ${Math.round(((settings as any)?.part_duree_risque ?? 0.25) * 100)} %`} />
                 </TableBody>
               </Table>
             </div>

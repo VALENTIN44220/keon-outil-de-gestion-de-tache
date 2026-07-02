@@ -53,6 +53,10 @@ export interface FdrSettings {
   echeance_standard_permanentes: string; // 'YYYY-MM-DD'
   horizon_debut: string;                 // 'YYYY-MM-DD'
   horizon_duree_mois: number;
+  /** Seuil de sous-effectif net (j/mois) au-delà duquel un mois compte comme « à risque » (déf. 5 = 25 % d'un ETP). */
+  seuil_sous_effectif_jours: number;
+  /** Part de la durée du projet devant être en risque pour qu'il soit classé « à risque » (déf. 0.25 = 25 %). */
+  part_duree_risque: number;
   created_at: string;
   updated_at: string;
 }
@@ -137,6 +141,10 @@ export interface FdrEngineSettings {
   horizon_debut: string;                 // 'YYYY-MM'
   horizon_duree_mois: number;
   profils: Array<{ code: string; capacite_j_mois: number }>;
+  /** Seuil de sous-effectif net (j/mois) → mois « à risque ». Déf. 5. */
+  seuil_sous_effectif_jours?: number;
+  /** Part de la durée du projet en risque → projet « à risque ». Déf. 0.25. */
+  part_duree_risque?: number;
 }
 
 // ---- Moteur de calcul — Sorties ----

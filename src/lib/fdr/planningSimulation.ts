@@ -136,34 +136,44 @@ export interface ProjectClassification {
  * Classe les projets selon que le service peut les tenir, sur la base de la
  * matrice ajustée du scénario.
  *
- * Heuristique : un projet est **tenable** si, sur tous les mois où il est actif
- * (build), tous les profils qu'il mobilise restent en écart simulé ≥ 0. Si un
- * profil mobilisé est en surcharge sur un de ces mois → **à risque**.
+ * Règle (paramétrable dans Params FDR) : un projet est **à risque** si, sur ses
+ * mois actifs (build), le sous-effectif net d'un profil qu'il mobilise dépasse
+ * `seuil_sous_effectif_jours` (déf. 5 j = 25 % d'un ETP) pendant plus de
+ * `part_duree_risque` (déf. 0.25 = 25 %) de sa durée. Sinon → **tenable**.
+ * Un mois isolé en légère surcharge ne suffit donc plus à classer « à risque ».
  *
  * Les projets hors feuille de route ou abandonnés (aucun mois actif) sont ignorés.
  */
 export function classifyProjects(
   inputs: FdrProjectInput[],
   adjusted: AdjustedMatrix,
-  settings: Pick<FdrEngineSettings, 'echeance_standard_permanentes' | 'jours_productifs_mois'>,
+  settings: Pick<
+    FdrEngineSettings,
+    'echeance_standard_permanentes' | 'jours_productifs_mois' | 'seuil_sous_effectif_jours' | 'part_duree_risque'
+  >,
 ): ProjectClassification {
   const tenable: FdrProjectInput[] = [];
   const aRisque: FdrProjectInput[] = [];
+  const seuil = settings.seuil_sous_effectif_jours ?? 5;
+  const part = settings.part_duree_risque ?? 0.25;
 
   for (const p of inputs) {
-    let active = false;
-    let risky = false;
+    let activeMonths = 0;
+    let riskMonths = 0;
     for (const ym of adjusted.months) {
       const loads = computeProjectMonthLoads(p, ym, settings);
       if (loads.length === 0) continue;
-      active = true;
+      activeMonths++;
+      // Pire sous-effectif (j) parmi les profils mobilisés ce mois.
+      let worstDeficit = 0;
       for (const l of loads) {
         const ecart = adjusted.by_profil[l.profil_code]?.ecart[ym];
-        if (ecart !== undefined && ecart < 0) { risky = true; break; }
+        if (ecart !== undefined && ecart < 0) worstDeficit = Math.max(worstDeficit, -ecart);
       }
-      if (risky) break;
+      if (worstDeficit > seuil) riskMonths++;
     }
-    if (!active) continue;
+    if (activeMonths === 0) continue;
+    const risky = riskMonths / activeMonths > part;
     (risky ? aRisque : tenable).push(p);
   }
 

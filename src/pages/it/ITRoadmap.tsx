@@ -432,6 +432,8 @@ function RoadmapContent() {
       horizon_debut: horizonDebut,
       horizon_duree_mois: horizonDuree,
       profils: profils.filter(p => p.actif).map(p => ({ code: p.code, capacite_j_mois: p.capacite_j_mois })),
+      seuil_sous_effectif_jours: (settings as any).seuil_sous_effectif_jours ?? 5,
+      part_duree_risque: (settings as any).part_duree_risque ?? 0.25,
     };
   }, [settings, profils, horizonDebut, horizonDuree]);
 

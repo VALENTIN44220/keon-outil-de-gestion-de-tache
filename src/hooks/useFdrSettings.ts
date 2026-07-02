@@ -31,14 +31,17 @@ export function useUpdateFdrSettings() {
         .limit(1)
         .maybeSingle();
 
+      // cast : les nouveaux champs (seuil/part risque) ne sont pas encore dans
+      // les types générés de fdr_settings.
+      const db = supabase as any;
       if (existing) {
-        const { error } = await supabase
+        const { error } = await db
           .from('fdr_settings')
           .update(patch)
           .eq('id', existing.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from('fdr_settings').insert(patch);
+        const { error } = await db.from('fdr_settings').insert(patch);
         if (error) throw error;
       }
     },
