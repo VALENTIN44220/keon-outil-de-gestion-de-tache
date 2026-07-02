@@ -23,6 +23,8 @@ import type { ProjectOverride } from '@/hooks/useFdrHireScenarios';
 
 const REAL = '__real__';
 const NEW_SCENARIO = '__new__';
+/** Overrides vides = valeurs réelles (référence de comparaison). */
+const EMPTY_OV = new Map<string, ProjectOverride>();
 
 interface Col {
   key: string;
@@ -157,6 +159,12 @@ export function FdrScenarioMatrix({
 
       {open && (
         <CardContent className="p-0 overflow-auto max-h-[60vh]">
+          <div className="flex flex-wrap items-center gap-3 px-3 py-2 text-[11px] text-muted-foreground border-b bg-muted/20">
+            <span className="font-medium">Différences vs Réel :</span>
+            <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-blue-100 border border-blue-300 inline-block" /> démarrage</span>
+            <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-amber-100 border border-amber-300 inline-block" /> ST</span>
+            <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-violet-100 border border-violet-300 inline-block" /> inclusion</span>
+          </div>
           <table className="w-full text-xs border-collapse">
             <thead className="sticky top-0 z-10 bg-background">
               <tr className="border-b">
@@ -178,7 +186,9 @@ export function FdrScenarioMatrix({
               </tr>
             </thead>
             <tbody>
-              {projects.map(p => (
+              {projects.map(p => {
+                const ref = eff(p, EMPTY_OV); // valeurs du Réel (référence)
+                return (
                 <tr key={p.id} className="border-b hover:bg-muted/20">
                   <td
                     className="px-3 py-1.5 sticky left-0 bg-background truncate max-w-[260px]"
@@ -188,10 +198,21 @@ export function FdrScenarioMatrix({
                   </td>
                   {columns.map(c => {
                     const e = eff(p, c.ovMap);
+                    // Différences vs Réel (colonne Réel exclue)
+                    const isRef = c.key === REAL;
+                    const dateDiff = !isRef && e.included && ref.included && e.startYm !== ref.startYm;
+                    const stDiff = !isRef && e.included && e.st !== ref.st;
+                    const inclDiff = !isRef && e.included !== ref.included;
+                    const dateHl = 'bg-blue-100 text-blue-800 rounded px-1';
                     return (
                       <td
                         key={c.key}
-                        className={cn('px-3 py-1.5 border-l align-top', c.editable && 'bg-violet-50/40')}
+                        className={cn(
+                          'px-3 py-1.5 border-l align-top',
+                          c.editable && 'bg-violet-50/40',
+                          inclDiff && 'bg-violet-100/60',
+                        )}
+                        title={dateDiff ? 'Démarrage différent du Réel' : stDiff ? 'ST différente du Réel' : inclDiff ? 'Inclusion différente du Réel' : undefined}
                       >
                         {c.editable ? (
                           <div className="flex items-center gap-2 flex-wrap">
@@ -210,7 +231,8 @@ export function FdrScenarioMatrix({
                                 type="month"
                                 value={e.startYm ?? ''}
                                 onChange={(ev) => setStart(c, p, c.ovMap, ev.target.value)}
-                                className="h-6 w-[108px] rounded border px-1 text-[11px] bg-background"
+                                className={cn('h-6 w-[108px] rounded border px-1 text-[11px] bg-background',
+                                  dateDiff && 'ring-1 ring-blue-400 bg-blue-50')}
                                 title="Mois de démarrage — décale la MEP d'autant (durée préservée)"
                               />
                             )}
@@ -221,7 +243,10 @@ export function FdrScenarioMatrix({
                                   onCheckedChange={() => toggleSt(c, p, e.st)}
                                   className="h-3.5 w-3.5"
                                 />
-                                <span className={cn(e.st ? 'text-amber-700 font-medium' : 'text-muted-foreground')}>ST</span>
+                                <span className={cn(
+                                  e.st ? 'text-amber-700 font-medium' : 'text-muted-foreground',
+                                  stDiff && 'bg-amber-100 ring-1 ring-amber-400 rounded px-1',
+                                )}>ST</span>
                               </label>
                             )}
                             {e.included && c.key === REAL && e.st && (
@@ -230,17 +255,21 @@ export function FdrScenarioMatrix({
                           </div>
                         ) : e.included ? (
                           <span className="flex items-center gap-1.5">
-                            <span className="tabular-nums">{fmtStart(e.startYm)}</span>
-                            {e.st && <Badge variant="outline" className="text-[9px] border-amber-300 text-amber-700">ST</Badge>}
+                            <span className={cn('tabular-nums', dateDiff && dateHl)}>{fmtStart(e.startYm)}</span>
+                            {e.st && (
+                              <Badge variant="outline" className={cn('text-[9px] border-amber-300 text-amber-700',
+                                stDiff && 'bg-amber-100 ring-1 ring-amber-400')}>ST</Badge>
+                            )}
                           </span>
                         ) : (
-                          <span className="text-muted-foreground/60">✗ hors FDR</span>
+                          <span className={cn('text-muted-foreground/60', inclDiff && 'text-violet-700 font-medium')}>✗ hors FDR</span>
                         )}
                       </td>
                     );
                   })}
                 </tr>
-              ))}
+                );
+              })}
               {projects.length === 0 && (
                 <tr>
                   <td colSpan={columns.length + 1} className="px-3 py-6 text-center text-muted-foreground">

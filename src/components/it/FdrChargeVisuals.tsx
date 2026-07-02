@@ -109,6 +109,8 @@ export function HeatmapCard({
                     const demand = peak.value;
                     const ecart = row.ecart[peak.ym] ?? 0;
                     const added = row.addedCap[peak.ym] ?? 0;
+                    // Capacité du mois = base + capacité ajoutée (simulation).
+                    const cap = profil.capacite_j_mois + added;
                     return (
                       <TooltipProvider key={per.key}>
                         <Tooltip>
@@ -117,8 +119,9 @@ export function HeatmapCard({
                               'text-center px-1 py-1.5 tabular-nums rounded cursor-default transition-colors',
                               cellClass(ecart, profil.capacite_j_mois),
                             )}>
-                              {demand > 0 ? round1(demand) : <span className="text-muted-foreground/40">—</span>}
-                              {added > 0 && <span className="ml-0.5 text-[9px] text-violet-600 font-semibold">+{round1(added)}</span>}
+                              {demand > 0
+                                ? <>{round1(demand)}<span className="opacity-50">/{round1(cap)}</span>{added > 0 && <span className="ml-0.5 text-[9px] text-violet-600 font-semibold">↑</span>}</>
+                                : <span className="text-muted-foreground/40">—</span>}
                             </td>
                           </TooltipTrigger>
                           <TooltipContent side="top" className="text-xs">
