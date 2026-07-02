@@ -25,6 +25,7 @@ import { useFdrProjects, usePatchFdrProject, type FdrRoadmapProject, type FdrPro
 import { FdrImportExport } from '@/components/it/FdrImportExport';
 import { FdrHistorySheet } from '@/components/it/FdrHistorySheet';
 import { FdrScenarioMatrix } from '@/components/it/FdrScenarioMatrix';
+import { FdrScenarioBilan } from '@/components/it/FdrScenarioBilan';
 import {
   HeatmapCard, SousEffectifParProfilCard, CascadeCard, SparklinesCard,
 } from '@/components/it/FdrChargeVisuals';
@@ -1091,6 +1092,11 @@ function RoadmapContent() {
         onSetOverride={setOverride}
         onToggleRealFdr={toggleFdr}
       />
+
+      {/* Bilan comparatif de tous les scénarios (renfort · coût · abandons · sous-effectif) */}
+      {engineSettings && (
+        <FdrScenarioBilan projects={projects} scenarios={scenarios} settings={engineSettings} />
+      )}
 
       {/* Visuels de plan de charge (impact du scénario / des décalages) */}
       {adjustedMatrix && engineSettings && (
