@@ -377,7 +377,9 @@ export function ITProjectForm({ project, onSaved, onCancel }: ITProjectFormProps
       suivi_j_mois: parseFloat(suiviJMois) || 0,
       externe,
       pct_reduction_si_externe: (parseFloat(pctReduction) || 0) / 100,
-      budget_externe_eur: budgetExterneEur ? parseFloat(budgetExterneEur) : null,
+      // 0 (et non null) : la colonne it_projects.budget_externe_eur est NOT NULL
+      // (un projet non externalisé a un budget de sous-traitance de 0).
+      budget_externe_eur: budgetExterneEur ? parseFloat(budgetExterneEur) : 0,
       sur_feuille_de_route: surFdr,
       pct_avancement: parseFloat(pctAvancement) || 0,
       // `progress` est la colonne affichée dans la liste/KPI : on la garde
