@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useId } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSimulation } from '@/contexts/SimulationContext';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { chunkedInQuery } from '@/lib/chunkedInQuery';
@@ -16,7 +17,9 @@ export interface CommentNotification {
 }
 
 export function useCommentNotifications() {
-  const { profile } = useAuth();
+  const { profile: authProfile } = useAuth();
+  const { getActiveProfile } = useSimulation();
+  const profile = getActiveProfile() ?? authProfile;
   const [commentNotifications, setCommentNotifications] = useState<CommentNotification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   // Unique channel name per hook instance. With <PersistentRoutes> keeping every visited page

@@ -9,6 +9,7 @@ import { useInAppNotifications } from '@/hooks/useInAppNotifications';
 import { usePendingValidationRequests } from '@/hooks/usePendingValidationRequests';
 import { usePendingTaskValidations } from '@/hooks/usePendingTaskValidations';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSimulation } from '@/contexts/SimulationContext';
 import { useDeadlineTasksOverride } from '@/contexts/DeadlineTasksOverrideContext';
 import { supabase } from '@/integrations/supabase/client';
 import type { Task } from '@/types/task';
@@ -22,7 +23,9 @@ interface AppNotificationClusterProps {
 
 export function AppNotificationCluster({ collapsed, className }: AppNotificationClusterProps) {
   const navigate = useNavigate();
-  const { profile } = useAuth();
+  const { profile: authProfile } = useAuth();
+  const { getActiveProfile } = useSimulation();
+  const profile = getActiveProfile() ?? authProfile;
   const deadlineOverride = useDeadlineTasksOverride();
 
   const { requests: pendingRequestValidations } = usePendingValidationRequests();
@@ -83,6 +86,10 @@ export function AppNotificationCluster({ collapsed, className }: AppNotification
         .maybeSingle();
       const mc = (data as any)?.module_code as string | null;
 
+      if (mc === 'cgi') {
+        navigate('/it/comite-gi');
+        return;
+      }
       const moduleRoutes: Record<string, string> = {
         it: '/it/dispatch',
         logistique: '/logistique/dispatch',
@@ -128,15 +135,26 @@ export function AppNotificationCluster({ collapsed, className }: AppNotification
         }}
         onWorkflowInAppClick={(row) => {
           void markWorkflowRead(row.id);
+          if (row.related_entity_type === 'supplier_waiting_approval') {
+            if (row.type === 'supplier_promoted') {
+              navigate('/suppliers');
+            } else if (row.related_entity_id && ['supplier_rejection', 'supplier_review_requested', 'supplier_deleted'].includes(row.type ?? '')) {
+              navigate(`/suppliers?myRequests=true&requestId=${encodeURIComponent(row.related_entity_id)}`);
+            } else {
+              navigate(`/suppliers?openWaiting=true`);
+            }
+            return;
+          }
+          if (row.related_entity_type === 'bug_report') {
+            navigate(`/bugs?openBug=${encodeURIComponent(row.related_entity_id ?? '')}`);
+            return;
+          }
           if (!row.related_entity_id) return;
-          // Routing selon le type d'entité liée
           if (row.related_entity_type === 'nc_declaration') {
             navigate(`/smq/${row.related_entity_id}`);
             return;
           }
           if (row.related_entity_type === 'task') {
-            // Notifs BE "nouvelle demande à dispatcher" → ouvre directement
-            // l'écran Dispatch BE avec la demande pré-sélectionnée + filtres réinitialisés.
             if (row.type === 'be_request_created') {
               navigate(`/be/dispatch?requestId=${encodeURIComponent(row.related_entity_id)}`);
               return;

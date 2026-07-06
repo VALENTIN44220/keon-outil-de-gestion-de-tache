@@ -67,6 +67,7 @@ export const menuGroups: MenuGroup[] = [
       { id: 'it-plan-de-charge', label: 'Plan de charge', icon: BarChart2, path: '/it/plan-de-charge', permissionKey: 'can_access_it_projects' },
       { id: 'it-portfolio-roi', label: 'Synthèse ROI', icon: TrendingUp, path: '/it/portfolio-roi', permissionKey: 'can_access_it_projects' },
       { id: 'it-admin-fdr', label: 'Params FDR', icon: Settings2, path: '/it/admin/fdr', permissionKey: 'can_access_it_projects' },
+      { id: 'it-comite-gi', label: 'Comité GI', icon: Users, path: '/it/comite-gi', permissionKey: 'can_access_it_projects' },
     ],
   },
   {

@@ -99,12 +99,21 @@ export interface UpdateBugReportInput {
   currentStatus?: BugStatus;
 }
 
-/** Mise à jour (triage admin). Trace l'historique si le statut change. */
+/** Mise à jour (triage admin ou assigné). Trace l'historique si le statut change.
+ *  Envoie une notification à l'assigné (lors de l'assignation) et au rapporteur (changement de statut). */
 export function useUpdateBugReport() {
   const qc = useQueryClient();
   const changedBy = useCurrentProfileId();
+  const { user } = useAuth();
   return useMutation({
     mutationFn: async ({ id, status, priority, assigned_to, currentStatus }: UpdateBugReportInput) => {
+      // Charger l'état actuel pour les notifications
+      const { data: current } = await db()
+        .from('bug_reports')
+        .select('ref, title, assigned_to, reported_by')
+        .eq('id', id)
+        .single();
+
       const patch: Record<string, unknown> = {};
       if (status !== undefined) {
         patch.status = status;
@@ -116,7 +125,7 @@ export function useUpdateBugReport() {
       const { error } = await db().from('bug_reports').update(patch).eq('id', id);
       if (error) throw error;
 
-      // Historique de statut (côté client : changed_by = profil courant)
+      // Historique de statut
       if (status !== undefined && status !== currentStatus) {
         await db().from('bug_report_status_history').insert({
           bug_report_id: id,
@@ -125,9 +134,52 @@ export function useUpdateBugReport() {
           changed_by: changedBy,
         });
       }
+
+      const bugRef = current?.ref ?? '';
+      const bugTitle = current?.title ?? '';
+
+      // Notifier l'assigné quand il est nouvellement affecté
+      if (assigned_to && assigned_to !== current?.assigned_to) {
+        const assigneeUserId = await profileToUserId(assigned_to);
+        if (assigneeUserId && assigneeUserId !== user?.id) {
+          await db().from('notifications').insert({
+            user_id: assigneeUserId,
+            title: 'Bug assigné',
+            message: `Le ticket ${bugRef} « ${bugTitle} » vous a été assigné.`,
+            type: 'bug_assigned',
+            related_entity_type: 'bug_report',
+            related_entity_id: id,
+          });
+        }
+      }
+
+      // Notifier le rapporteur quand le statut change (sauf si c'est lui qui change)
+      if (status !== undefined && status !== currentStatus && current?.reported_by) {
+        const reporterUserId = await profileToUserId(current.reported_by);
+        if (reporterUserId && reporterUserId !== user?.id) {
+          const statusLabel = status.replace('_', ' ');
+          await db().from('notifications').insert({
+            user_id: reporterUserId,
+            title: 'Mise à jour de votre signalement',
+            message: `Le ticket ${bugRef} « ${bugTitle} » est passé en « ${statusLabel} ».`,
+            type: 'bug_status_change',
+            related_entity_type: 'bug_report',
+            related_entity_id: id,
+          });
+        }
+      }
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
   });
+}
+
+async function profileToUserId(profileId: string): Promise<string | null> {
+  const { data } = await db()
+    .from('profiles')
+    .select('user_id')
+    .eq('id', profileId)
+    .maybeSingle();
+  return data?.user_id ?? null;
 }
 
 /** Suppression douce (soft delete) — réservée aux admins (gardé côté UI). */

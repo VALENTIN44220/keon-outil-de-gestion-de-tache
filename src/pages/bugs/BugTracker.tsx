@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -26,6 +27,8 @@ const ALL = 'all';
 export default function BugTracker() {
   const { isAdmin } = useUserRole();
   const { data: bugs = [], isLoading } = useBugReports();
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const [search, setSearch] = useState('');
   const [fType, setFType] = useState(ALL);
@@ -33,6 +36,16 @@ export default function BugTracker() {
   const [fPriority, setFPriority] = useState(ALL);
   const [showNew, setShowNew] = useState(false);
   const [selected, setSelected] = useState<BugReport | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const openBugId = params.get('openBug');
+    if (openBugId && bugs.length > 0) {
+      const found = bugs.find((b) => b.id === openBugId);
+      if (found) setSelected(found);
+      navigate(location.pathname, { replace: true });
+    }
+  }, [location.search, bugs, navigate, location.pathname]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();

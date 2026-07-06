@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSimulation } from '@/contexts/SimulationContext';
 import { Task } from '@/types/task';
 
 /**
@@ -8,7 +9,9 @@ import { Task } from '@/types/task';
  * A user sees tasks where they are the designated validator at the current pending level.
  */
 export function usePendingTaskValidations() {
-  const { profile } = useAuth();
+  const { profile: authProfile } = useAuth();
+  const { getActiveProfile } = useSimulation();
+  const profile = getActiveProfile() ?? authProfile;
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 

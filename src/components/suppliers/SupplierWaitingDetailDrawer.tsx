@@ -15,10 +15,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import { SupplierWaitingReviewRequestDialog } from './SupplierWaitingReviewRequestDialog';
-import { supplierWaitingValidationRoleFromProfileName, extractPermissionProfileName } from '@/lib/supplierWaitingValidationRole';
+import { useSupplierValidationRole } from '@/hooks/useSupplierValidationRole';
 import { useUserRole } from '@/hooks/useUserRole';
-import { useAuth } from '@/contexts/AuthContext';
-import { useSimulation } from '@/contexts/SimulationContext';
 import { isAllowedDemandAttachmentFile } from '@/lib/newSupplierDemandConstants';
 
 interface Props {
@@ -110,9 +108,6 @@ function EditableField({
 export function SupplierWaitingDetailDrawer({ waitingId, onClose }: Props) {
   const { data, isLoading, refetch } = useSupplierWaitingApprovalDetail(waitingId);
   const queryClient = useQueryClient();
-  const { profile: authProfile } = useAuth();
-  const { getActiveProfile } = useSimulation();
-  const profile = getActiveProfile() ?? authProfile;
   const open = !!waitingId;
 
   const [editMode, setEditMode] = useState(false);
@@ -127,9 +122,8 @@ export function SupplierWaitingDetailDrawer({ waitingId, onClose }: Props) {
   const kbisInputRef = useRef<HTMLInputElement>(null);
 
   const { isAdmin } = useUserRole();
-  const permissionProfileName = extractPermissionProfileName(profile);
-  const validationRole = supplierWaitingValidationRoleFromProfileName(permissionProfileName);
-  const canReview = isAdmin || validationRole === 'achat' || validationRole === 'compta' || validationRole === 'hybrid';
+  const { data: validationRole = 'none' } = useSupplierValidationRole();
+  const canReview = validationRole !== 'none';
 
   const hasModificationsRequested = data?.status === 'modifications_demandees';
   const reviewsByField = Object.fromEntries(

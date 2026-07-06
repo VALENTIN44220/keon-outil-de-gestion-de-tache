@@ -13,7 +13,7 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
-import { useUpdateBugReport, useDeleteBugReport, useBugReportStatusHistory } from '@/hooks/useBugReports';
+import { useUpdateBugReport, useDeleteBugReport, useBugReportStatusHistory, useCurrentProfileId } from '@/hooks/useBugReports';
 import { useBugReportComments } from '@/hooks/useBugReportComments';
 import { useBugReportAttachments } from '@/hooks/useBugReportAttachments';
 import {
@@ -47,6 +47,7 @@ export function BugReportDetail({ bug, open, onOpenChange, isAdmin }: BugReportD
   const { comments, addComment, deleteComment, isSending, userProfileId } = useBugReportComments(bug?.id ?? null);
   const { attachments, uploadAttachment, removeAttachment, isUploading } = useBugReportAttachments(bug?.id ?? null);
   const { data: history = [] } = useBugReportStatusHistory(bug?.id ?? null);
+  const currentProfileId = useCurrentProfileId();
 
   const [message, setMessage] = useState('');
   const [people, setPeople] = useState<{ id: string; display_name: string }[]>([]);
@@ -59,6 +60,8 @@ export function BugReportDetail({ bug, open, onOpenChange, isAdmin }: BugReportD
 
   if (!bug) return null;
 
+  const isAssignee = !!currentProfileId && bug.assigned_to === currentProfileId;
+  const canChangeStatus = isAdmin || isAssignee;
   const typeCfg = BUG_TYPE_CONFIG[bug.type];
   const statusCfg = BUG_STATUS_CONFIG[bug.status];
   const prioCfg = BUG_PRIORITY_CONFIG[bug.priority];
@@ -135,6 +138,23 @@ export function BugReportDetail({ bug, open, onOpenChange, isAdmin }: BugReportD
                   onClick={() => { if (confirm('Supprimer ce ticket ?')) { del.mutate(bug.id); onOpenChange(false); } }}>
                   <Trash2 className="h-3.5 w-3.5" /> Supprimer
                 </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Panneau assigné (non-admin) : changement de statut */}
+          {canChangeStatus && !isAdmin && (
+            <div className="rounded-lg border p-3 space-y-2 bg-amber-50/30">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Mise à jour</p>
+              <div className="flex items-center gap-3">
+                <Label className="text-xs shrink-0">Statut</Label>
+                <Select value={bug.status} onValueChange={(v) =>
+                  update.mutate({ id: bug.id, status: v as BugStatus, currentStatus: bug.status })}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {BUG_STATUS_OPTIONS.map((s) => <SelectItem key={s} value={s}>{BUG_STATUS_CONFIG[s].label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           )}

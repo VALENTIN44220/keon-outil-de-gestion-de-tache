@@ -34,10 +34,8 @@ import {
   migrateWaitingAttachmentsToEnrichment,
   parseWaitingAttachmentsJson,
 } from '@/lib/supplierWaitingPromote';
-import { supplierWaitingValidationRoleFromProfileName, extractPermissionProfileName } from '@/lib/supplierWaitingValidationRole';
+import { useSupplierValidationRole } from '@/hooks/useSupplierValidationRole';
 import { useUserRole } from '@/hooks/useUserRole';
-import { useAuth } from '@/contexts/AuthContext';
-import { useSimulation } from '@/contexts/SimulationContext';
 import { SupplierWaitingDetailDrawer } from './SupplierWaitingDetailDrawer';
 import { SupplierWaitingRejectDialog } from './SupplierWaitingRejectDialog';
 import { SupplierWaitingReviewRequestDialog } from './SupplierWaitingReviewRequestDialog';
@@ -49,9 +47,6 @@ export interface SupplierWaitingApprovalListDialogProps {
 
 export function SupplierWaitingApprovalListDialog({ open, onClose }: SupplierWaitingApprovalListDialogProps) {
   const queryClient = useQueryClient();
-  const { profile: authProfile } = useAuth();
-  const { getActiveProfile } = useSimulation();
-  const profile = getActiveProfile() ?? authProfile;
   const { data: rows = [], isLoading, refetch, isRefetching } = useSupplierWaitingApprovalList({ enabled: open });
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
@@ -109,15 +104,35 @@ export function SupplierWaitingApprovalListDialog({ open, onClose }: SupplierWai
     );
 
   const { isAdmin } = useUserRole();
-  const permissionProfileName = extractPermissionProfileName(profile);
-  const validationRole = supplierWaitingValidationRoleFromProfileName(permissionProfileName);
-  const canReject = isAdmin || validationRole === 'achat' || validationRole === 'compta' || validationRole === 'hybrid';
+  const { data: validationRole = 'none' } = useSupplierValidationRole();
+  const canReject = validationRole !== 'none';
 
   const comptaBlockedUntilAchat =
     !allSelectedReadyForPromote &&
     validationRole === 'compta' &&
     selectedCount > 0 &&
     selectedRowsResolved.some((r) => !r.validated_by_achats_at);
+
+  const canBoth = validationRole === 'both';
+
+  const nextStepIsAchat =
+    canBoth &&
+    selectedCount > 0 &&
+    selectedRowsResolved.some((r) => !r.validated_by_achats_at);
+
+  const validationButtonLabel = allSelectedReadyForPromote
+    ? selectedCount > 1
+      ? 'Ajouter les fournisseurs à la base de données'
+      : 'Ajouter le fournisseur à la base de données'
+    : canBoth
+      ? nextStepIsAchat
+        ? 'Valider — étape Achats'
+        : 'Valider — étape Comptabilité'
+      : validationRole === 'achat'
+        ? 'Valider (Achats)'
+        : validationRole === 'compta'
+          ? 'Valider (Comptabilité)'
+          : 'Valider le(s) fournisseur(s)';
 
   const handleSaveTiers = async (waitingId: string, raw: string) => {
     const v = raw.trim();
@@ -154,12 +169,18 @@ export function SupplierWaitingApprovalListDialog({ open, onClose }: SupplierWai
         p_waiting_ids: Array.from(selectedIds),
       });
       if (error) throw error;
+      const stepLabel =
+        canBoth
+          ? nextStepIsAchat ? 'Achats' : 'Comptabilité'
+          : validationRole === 'achat' ? 'Achats'
+          : validationRole === 'compta' ? 'Comptabilité'
+          : 'votre profil';
       toast({
         title: 'Validation enregistrée',
         description:
           selectedCount > 1
-            ? `${selectedCount} demandes mises à jour selon votre profil (Achat, Comptabilité ou les deux).`
-            : 'La demande a été mise à jour selon votre profil (Achat, Comptabilité ou les deux).',
+            ? `${selectedCount} demandes validées (étape ${stepLabel}).`
+            : `La demande a été validée (étape ${stepLabel}).`,
       });
       await queryClient.invalidateQueries({ queryKey: ['supplier-waiting-approval'] });
       await refetch();
@@ -486,13 +507,7 @@ export function SupplierWaitingApprovalListDialog({ open, onClose }: SupplierWai
               >
                 <span className="inline-flex items-center justify-center gap-2 text-center">
                   {(validating || promoting) && <Loader2 className="h-4 w-4 animate-spin shrink-0" />}
-                  <span>
-                    {allSelectedReadyForPromote
-                      ? selectedCount > 1
-                        ? 'Ajouter les fournisseurs à la base de données'
-                        : 'Ajouter le fournisseur à la base de données'
-                      : 'Valider le(s) fournisseur(s)'}
-                  </span>
+                  <span>{validationButtonLabel}</span>
                 </span>
               </Button>
             </div>

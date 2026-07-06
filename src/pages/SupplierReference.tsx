@@ -3,9 +3,7 @@ import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useEffectivePermissions } from '@/hooks/useEffectivePermissions';
 import { useSupplierAccess } from '@/hooks/useSupplierAccess';
 import { useUserRole } from '@/hooks/useUserRole';
-import { useAuth } from '@/contexts/AuthContext';
-import { useSimulation } from '@/contexts/SimulationContext';
-import { supplierWaitingValidationRoleFromProfileName, extractPermissionProfileName } from '@/lib/supplierWaitingValidationRole';
+import { useSupplierValidationRole } from '@/hooks/useSupplierValidationRole';
 import { SupplierListView } from '@/components/suppliers/SupplierListView';
 import { SupplierDetailDrawer } from '@/components/suppliers/SupplierDetailDrawer';
 import { SupplierSynthesisModal } from '@/components/suppliers/SupplierSynthesisModal';
@@ -23,21 +21,11 @@ export default function SupplierReference() {
   const { effectivePermissions, isLoading: permLoading } = useEffectivePermissions();
   const { supplierPermissions, role: supplierRole, isLoading: accessLoading } = useSupplierAccess();
   const { isAdmin } = useUserRole();
-  const { profile: authProfile } = useAuth();
-  const { getActiveProfile } = useSimulation();
+  const { data: validationRole = 'none' } = useSupplierValidationRole();
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Profil actif (simulé ou réel) → rôle validation
-  const activeProfile = getActiveProfile() ?? authProfile;
-  const permProfileName = extractPermissionProfileName(activeProfile);
-  const validationRole = supplierWaitingValidationRoleFromProfileName(permProfileName);
-  /** Peut voir la liste d'attente et valider/refuser */
-  const canManageValidations =
-    isAdmin ||
-    validationRole === 'achat' ||
-    validationRole === 'compta' ||
-    validationRole === 'hybrid';
+  const canManageValidations = validationRole !== 'none';
 
   const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);

@@ -112,6 +112,7 @@ import ITPortfolioROI from "./pages/it/ITPortfolioROI";
 import ITRoadmap from "./pages/it/ITRoadmap";
 import ITRoadmapDefinition from "./pages/it/ITRoadmapDefinition";
 import ITRoadmapTracking from "./pages/it/ITRoadmapTracking";
+import ITComiteGI from "./pages/it/ITComiteGI";
 import BugTracker from "./pages/bugs/BugTracker";
 import Documentation from "./pages/Documentation";
 import SMQDashboard from "./pages/smq/SMQDashboard";
@@ -232,6 +233,7 @@ const App = () => (
                 { path: "/it/projects/:code/roi", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITProjectHubROI /></ITProjectsAccessGate></ProtectedRoute> },
                 { path: "/it/projects/:code/edit", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITProjectHubEdit /></ITProjectsAccessGate></ProtectedRoute> },
                 { path: "/it/portfolio-roi", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITPortfolioROI /></ITProjectsAccessGate></ProtectedRoute> },
+                { path: "/it/comite-gi", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITComiteGI /></ITProjectsAccessGate></ProtectedRoute> },
 
                 { path: "/documentation", end: true, element: <ProtectedRoute><Documentation /></ProtectedRoute> },
                 { path: "/bugs", end: true, element: <ProtectedRoute><BugTracker /></ProtectedRoute> },
@@ -324,6 +326,7 @@ const App = () => (
             <Route path="/it/projects/:code/edit" element={<></>} />
             <Route path="/it/projects/new" element={<></>} />
             <Route path="/it/portfolio-roi" element={<></>} />
+            <Route path="/it/comite-gi" element={<></>} />
             <Route path="/design-system" element={<DesignSystem />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
