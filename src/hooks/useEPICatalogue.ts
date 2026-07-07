@@ -7,7 +7,7 @@ import type {
   EPICategorie, EPIProfil, EPICatalogueItem,
 } from '@/types/epi';
 
-export function useEPICatalogue(profilFilter?: EPIProfil, categorieFilter?: EPICategorie) {
+export function useEPICatalogue(profilFilter?: EPIProfil, categorieFilter?: EPICategorie, includeInactive = false) {
   const { user } = useAuth();
   const [articles, setArticles] = useState<EPICatalogueItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -16,17 +16,14 @@ export function useEPICatalogue(profilFilter?: EPIProfil, categorieFilter?: EPIC
     if (!user) return;
     setIsLoading(true);
     try {
-      const { data: articlesData, error: artErr } = await supabase
-        .from('epi_articles' as any)
-        .select('*')
-        .eq('is_active', true)
-        .order('order_index');
+      let artQuery = supabase.from('epi_articles' as any).select('*').order('order_index');
+      if (!includeInactive) artQuery = artQuery.eq('is_active', true);
+      const { data: articlesData, error: artErr } = await artQuery;
       if (artErr) throw artErr;
 
-      const { data: taillesData, error: tailErr } = await supabase
-        .from('epi_article_tailles' as any)
-        .select('*')
-        .eq('is_active', true);
+      let tailQuery = supabase.from('epi_article_tailles' as any).select('*');
+      if (!includeInactive) tailQuery = tailQuery.eq('is_active', true);
+      const { data: taillesData, error: tailErr } = await tailQuery;
       if (tailErr) throw tailErr;
 
       const { data: profilData, error: profErr } = await supabase
@@ -76,7 +73,7 @@ export function useEPICatalogue(profilFilter?: EPIProfil, categorieFilter?: EPIC
     } finally {
       setIsLoading(false);
     }
-  }, [user, profilFilter, categorieFilter]);
+  }, [user, profilFilter, categorieFilter, includeInactive]);
 
   useEffect(() => {
     void fetchCatalogue();

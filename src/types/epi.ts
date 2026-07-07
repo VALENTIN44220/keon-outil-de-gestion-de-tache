@@ -149,6 +149,7 @@ export interface EPIRequest {
   filiale: string | null;
   date_souhaitee: string | null;
   justification: string | null;
+  ref_devis_divalto: string | null;
   ref_commande_divalto: string | null;
   ref_bl_divalto: string | null;
   ref_facture_divalto: string | null;

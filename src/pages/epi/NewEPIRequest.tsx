@@ -18,6 +18,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useEPICatalogue } from '@/hooks/useEPICatalogue';
+import { usePermissionsContext } from '@/contexts/PermissionsContext';
 import type { EPIProfil, EPITypeDemande, EPICatalogueItem, EPICategorie } from '@/types/epi';
 import {
   EPI_PROFIL_LABELS, EPI_TYPE_DEMANDE_LABELS, EPI_CATEGORIE_LABELS, EPI_PROFILS,
@@ -83,6 +84,9 @@ export default function NewEPIRequest() {
   useEffect(() => {
     if (profile?.id && !beneficiaireId) setBeneficiaireId(profile.id);
   }, [profile?.id]);
+
+  const { effectivePermissions } = usePermissionsContext();
+  const showPrices = effectivePermissions.can_manage_epi;
 
   const selectedBeneficiaire = allProfiles.find(p => p.id === beneficiaireId);
 
@@ -379,6 +383,7 @@ export default function NewEPIRequest() {
                           selectedLines={lines.filter(l => l.articleId === art.id)}
                           onAdd={(tailleId) => addLine(art, tailleId)}
                           disabled={isSubmitting}
+                          showPrices={showPrices}
                         />
                       ))}
                     </div>
@@ -398,7 +403,7 @@ export default function NewEPIRequest() {
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium truncate">{l.designation}</p>
                           <p className="text-xs text-muted-foreground">
-                            {l.refSycomore} — Taille {l.taille} — {fmtEur(l.prixUnitaire + l.prixFlocage)} /u
+                            {l.refSycomore} — Taille {l.taille}{showPrices ? ` — ${fmtEur(l.prixUnitaire + l.prixFlocage)} /u` : ''}
                           </p>
                         </div>
                         <div className="flex items-center gap-1">
@@ -412,9 +417,11 @@ export default function NewEPIRequest() {
                             <Plus className="h-3 w-3" />
                           </Button>
                         </div>
-                        <span className="text-sm font-mono w-20 text-right">
-                          {fmtEur(l.quantite * (l.prixUnitaire + l.prixFlocage))}
-                        </span>
+                        {showPrices && (
+                          <span className="text-sm font-mono w-20 text-right">
+                            {fmtEur(l.quantite * (l.prixUnitaire + l.prixFlocage))}
+                          </span>
+                        )}
                         <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive"
                           onClick={() => removeLine(idx)} disabled={isSubmitting}>
                           <X className="h-3 w-3" />
@@ -422,9 +429,11 @@ export default function NewEPIRequest() {
                       </div>
                     ))}
                   </div>
-                  <div className="flex justify-end pt-2 border-t text-lg font-semibold">
-                    Total : {fmtEur(total)}
-                  </div>
+                  {showPrices && (
+                    <div className="flex justify-end pt-2 border-t text-lg font-semibold">
+                      Total : {fmtEur(total)}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )}
@@ -447,12 +456,13 @@ export default function NewEPIRequest() {
 }
 
 function ArticleCard({
-  article: art, selectedLines, onAdd, disabled,
+  article: art, selectedLines, onAdd, disabled, showPrices,
 }: {
   article: EPICatalogueItem;
   selectedLines: SelectedLine[];
   onAdd: (tailleId: string) => void;
   disabled: boolean;
+  showPrices: boolean;
 }) {
   const [selectedTaille, setSelectedTaille] = useState(
     art.tailles.length === 1 ? art.tailles[0].id : '',
@@ -498,7 +508,7 @@ function ArticleCard({
           </a>
         )}
       </div>
-      <p className="text-xs text-muted-foreground">{prixRange}</p>
+      {showPrices && <p className="text-xs text-muted-foreground">{prixRange}</p>}
       <div className="flex gap-2">
         {art.tailles.length > 1 ? (
           <Select value={selectedTaille} onValueChange={setSelectedTaille} disabled={disabled}>
@@ -508,7 +518,7 @@ function ArticleCard({
             <SelectContent>
               {art.tailles.map(t => (
                 <SelectItem key={t.id} value={t.id} className="text-xs">
-                  {t.taille} — {fmtEur(t.prix_achat)}
+                  {t.taille}{showPrices ? ` — ${fmtEur(t.prix_achat)}` : ''}
                 </SelectItem>
               ))}
             </SelectContent>

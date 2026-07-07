@@ -37,7 +37,9 @@ const STATUT_COLORS: Record<string, string> = {
 
 const EPI_STATUS_LABELS: Record<string, string> = {
   todo: 'Soumise',
-  'in-progress': 'En cours',
+  'in-progress': 'En cours de traitement',
+  commandee: 'Commandée fournisseur',
+  attribuee: 'Attribuée',
   done: 'Clôturée',
   cancelled: 'Annulée',
 };
@@ -45,7 +47,9 @@ const EPI_STATUS_LABELS: Record<string, string> = {
 const EPI_STATUS_COLORS: Record<string, string> = {
   todo: 'bg-amber-100 text-amber-800 border-amber-300',
   'in-progress': 'bg-blue-100 text-blue-800 border-blue-300',
-  done: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+  commandee: 'bg-purple-100 text-purple-800 border-purple-300',
+  attribuee: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+  done: 'bg-slate-100 text-slate-800 border-slate-300',
   cancelled: 'bg-red-100 text-red-800 border-red-300',
 };
 
@@ -194,6 +198,7 @@ export const epiDispatchConfig: ModuleDispatchConfig<EPIRequest, {}> = {
     r.beneficiaire_nom ?? '',
     r.beneficiaire_prenom ?? '',
     r.filiale ?? '',
+    r.ref_devis_divalto ?? '',
     r.ref_commande_divalto ?? '',
     ...(r.lignes?.map(l => l.designation) ?? []),
   ],
@@ -382,6 +387,7 @@ function EPIDetailDialog({ request, open, onClose, refetch, isAdmin, profilesMap
   const { effectivePermissions } = usePermissionsContext();
   const canManage = effectivePermissions.can_manage_epi || isAdmin;
 
+  const [refDevis, setRefDevis] = useState(request.ref_devis_divalto ?? '');
   const [refCommande, setRefCommande] = useState(request.ref_commande_divalto ?? '');
   const [refBl, setRefBl] = useState(request.ref_bl_divalto ?? '');
   const [refFacture, setRefFacture] = useState(request.ref_facture_divalto ?? '');
@@ -391,7 +397,7 @@ function EPIDetailDialog({ request, open, onClose, refetch, isAdmin, profilesMap
 
   const saveDivaltoRefs = async () => {
     try {
-      const md = { ...(request.module_data ?? {}), ref_commande_divalto: refCommande || null, ref_bl_divalto: refBl || null, ref_facture_divalto: refFacture || null };
+      const md = { ...(request.module_data ?? {}), ref_devis_divalto: refDevis || null, ref_commande_divalto: refCommande || null, ref_bl_divalto: refBl || null, ref_facture_divalto: refFacture || null };
       await supabase.from('tasks').update({ module_data: md }).eq('id', request.task_id);
       toast.success('Références Divalto mises à jour');
       refetch();
@@ -496,18 +502,22 @@ function EPIDetailDialog({ request, open, onClose, refetch, isAdmin, profilesMap
       icon: <Truck className="h-3 w-3" />,
       content: (
         <div className="space-y-3">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div>
-              <Label className="text-xs">Réf. commande</Label>
-              <Input value={refCommande} onChange={e => setRefCommande(e.target.value)} placeholder="N° commande Divalto" className="h-8 text-xs" />
+              <Label className="text-xs">N° devis (DCS)</Label>
+              <Input value={refDevis} onChange={e => setRefDevis(e.target.value)} placeholder="DCS..." className="h-8 text-xs" />
             </div>
             <div>
-              <Label className="text-xs">Réf. BL</Label>
-              <Input value={refBl} onChange={e => setRefBl(e.target.value)} placeholder="N° bon de livraison" className="h-8 text-xs" />
+              <Label className="text-xs">N° commande (CCS)</Label>
+              <Input value={refCommande} onChange={e => setRefCommande(e.target.value)} placeholder="CCS..." className="h-8 text-xs" />
             </div>
             <div>
-              <Label className="text-xs">Réf. facture</Label>
-              <Input value={refFacture} onChange={e => setRefFacture(e.target.value)} placeholder="N° facture" className="h-8 text-xs" />
+              <Label className="text-xs">N° BL</Label>
+              <Input value={refBl} onChange={e => setRefBl(e.target.value)} placeholder="BL..." className="h-8 text-xs" />
+            </div>
+            <div>
+              <Label className="text-xs">N° facture (FCS/CFX)</Label>
+              <Input value={refFacture} onChange={e => setRefFacture(e.target.value)} placeholder="FCS/CFX..." className="h-8 text-xs" />
             </div>
           </div>
           <Button size="sm" variant="outline" onClick={saveDivaltoRefs}>
@@ -547,19 +557,20 @@ function EPIDetailDialog({ request, open, onClose, refetch, isAdmin, profilesMap
       key: 'cmd',
       label: 'Marquer commandée',
       onClick: async () => {
+        await supabase.from('tasks').update({ status: 'commandee' }).eq('id', request.task_id);
         await supabase.from('epi_demande_lignes' as any).update({ statut: 'commandee' }).eq('request_id', request.task_id);
-        toast.success('Lignes marquées commandées');
+        toast.success('Demande marquée commandée');
         refetch();
       },
     });
+  } else if (request.status === 'commandee' && canManage) {
     statusActions.push({
       key: 'attr',
-      label: 'Attribuer et clôturer',
+      label: 'Marquer attribuée',
       onClick: async () => {
+        await supabase.from('tasks').update({ status: 'attribuee' }).eq('id', request.task_id);
         await supabase.from('epi_demande_lignes' as any).update({ statut: 'attribuee' }).eq('request_id', request.task_id);
-        await supabase.from('tasks').update({ status: 'done' }).eq('id', request.task_id);
 
-        // Historiser dans epi_attributions
         if (request.beneficiaire_id) {
           const attributions = (request.lignes ?? []).map(l => ({
             beneficiaire_id: request.beneficiaire_id!,
@@ -573,7 +584,17 @@ function EPIDetailDialog({ request, open, onClose, refetch, isAdmin, profilesMap
           }
         }
 
-        toast.success('EPI attribués — demande clôturée');
+        toast.success('EPI attribués au bénéficiaire');
+        refetch();
+      },
+    });
+  } else if (request.status === 'attribuee' && canManage) {
+    statusActions.push({
+      key: 'close',
+      label: 'Clôturer',
+      onClick: async () => {
+        await supabase.from('tasks').update({ status: 'done' }).eq('id', request.task_id);
+        toast.success('Demande clôturée');
         refetch();
       },
     });

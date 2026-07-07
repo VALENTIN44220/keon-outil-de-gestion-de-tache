@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { ShoppingBag, Search, Plus, FileText, Loader2, Upload, Trash2 } from 'lucide-react';
+import { ShoppingBag, Search, Plus, FileText, Loader2, Upload, Trash2, Eye, EyeOff } from 'lucide-react';
 import { useEPICatalogue } from '@/hooks/useEPICatalogue';
 import { usePermissionsContext } from '@/contexts/PermissionsContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -31,6 +31,7 @@ export default function EPICatalogue() {
   const { articles, isLoading, refetch } = useEPICatalogue(
     undefined,
     categorie !== 'all' ? categorie : undefined,
+    canManage,
   );
 
   const filtered = search.trim()
@@ -96,7 +97,7 @@ export default function EPICatalogue() {
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mt-4">
                   {filtered.map((art) => (
-                    <CatalogueCard key={art.id} article={art} canManage={canManage} onUpdate={refetch} />
+                    <CatalogueCard key={art.id} article={art} canManage={canManage} showPrices={canManage} onUpdate={refetch} />
                   ))}
                 </div>
               )}
@@ -108,7 +109,7 @@ export default function EPICatalogue() {
   );
 }
 
-function CatalogueCard({ article: art, canManage, onUpdate }: { article: EPICatalogueItem; canManage: boolean; onUpdate: () => void }) {
+function CatalogueCard({ article: art, canManage, showPrices, onUpdate }: { article: EPICatalogueItem; canManage: boolean; showPrices: boolean; onUpdate: () => void }) {
   const [expanded, setExpanded] = useState(false);
   const [uploading, setUploading] = useState(false);
 
@@ -140,6 +141,17 @@ function CatalogueCard({ article: art, canManage, onUpdate }: { article: EPICata
     }
   };
 
+  const handleToggleActive = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await supabase.from('epi_articles' as any).update({ is_active: !art.is_active }).eq('id', art.id);
+      toast.success(art.is_active ? 'Article masqué des demandes' : 'Article visible dans les demandes');
+      onUpdate();
+    } catch (err: any) {
+      toast.error(`Erreur : ${err.message}`);
+    }
+  };
+
   const handleRemoveFT = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!confirm('Retirer la fiche technique de cet article ?')) return;
@@ -154,26 +166,35 @@ function CatalogueCard({ article: art, canManage, onUpdate }: { article: EPICata
 
   return (
     <Card
-      className={cn('cursor-pointer transition-all hover:shadow-md', expanded && 'ring-1 ring-amber-300')}
+      className={cn(
+        'cursor-pointer transition-all hover:shadow-md',
+        expanded && 'ring-1 ring-amber-300',
+        !art.is_active && 'opacity-50 border-dashed',
+      )}
       onClick={() => setExpanded(!expanded)}
     >
       <CardContent className="p-4 space-y-2">
         <div className="flex items-start justify-between gap-2">
           <p className="text-sm font-semibold leading-tight">{art.designation}</p>
-          <Badge variant="outline" className="text-[10px] shrink-0">
-            {EPI_CATEGORIE_LABELS[art.categorie] ?? art.categorie}
-          </Badge>
+          <div className="flex items-center gap-1 shrink-0">
+            {!art.is_active && (
+              <Badge variant="outline" className="text-[10px] bg-red-50 text-red-600 border-red-200">Masqué</Badge>
+            )}
+            <Badge variant="outline" className="text-[10px]">
+              {EPI_CATEGORIE_LABELS[art.categorie] ?? art.categorie}
+            </Badge>
+          </div>
         </div>
 
         {art.norme && (
           <p className="text-xs text-muted-foreground">{art.norme}</p>
         )}
 
-        <p className="text-sm font-mono text-amber-700">{prixLabel} HT</p>
+        {showPrices && <p className="text-sm font-mono text-amber-700">{prixLabel} HT</p>}
 
         {art.type_flocage && art.type_flocage !== 'aucun' && (
           <p className="text-[10px] text-muted-foreground">
-            Flocage : {art.type_flocage.replace('_', ' ')} ({fmtEur(art.prix_flocage ?? 0)})
+            Flocage : {art.type_flocage.replace('_', ' ')}{showPrices ? ` (${fmtEur(art.prix_flocage ?? 0)})` : ''}
           </p>
         )}
 
@@ -192,7 +213,7 @@ function CatalogueCard({ article: art, canManage, onUpdate }: { article: EPICata
               <div className="flex flex-wrap gap-1">
                 {art.tailles.map(t => (
                   <Badge key={t.id} variant="secondary" className="text-[10px]">
-                    {t.taille} — {fmtEur(t.prix_achat)}
+                    {t.taille}{showPrices ? ` — ${fmtEur(t.prix_achat)}` : ''}
                   </Badge>
                 ))}
               </div>
@@ -228,6 +249,16 @@ function CatalogueCard({ article: art, canManage, onUpdate }: { article: EPICata
                       <Trash2 className="h-3 w-3" /> Retirer
                     </button>
                   )}
+                  <button
+                    className={cn(
+                      'inline-flex items-center gap-1',
+                      art.is_active ? 'text-emerald-600 hover:text-emerald-800' : 'text-red-500 hover:text-red-700',
+                    )}
+                    onClick={handleToggleActive}
+                  >
+                    {art.is_active ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+                    {art.is_active ? 'Visible' : 'Masqué'}
+                  </button>
                 </>
               )}
             </div>
