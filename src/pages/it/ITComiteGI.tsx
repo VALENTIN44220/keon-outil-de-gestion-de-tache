@@ -11,8 +11,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
-  CalendarClock, Plus, Trash2, ChevronRight, Users, FileText,
-  Pencil, Loader2, ListChecks, Search,
+  CalendarClock, Plus, Trash2, Users, FileText,
+  Pencil, Loader2, ListChecks, Search, History,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -21,7 +21,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useUserRole } from '@/hooks/useUserRole';
 import {
   useCGISessions, useCreateCGISession, useUpdateCGISession, useDeleteCGISession,
-  useAllCGIActions, useCGIActions, useCreateCGIAction, useUpdateCGIAction, useDeleteCGIAction,
+  useAllCGIActions, useCreateCGIAction, useUpdateCGIAction, useDeleteCGIAction,
+  useCGIChanges, type CGIActionChange,
 } from '@/hooks/useCGI';
 import { CGI_FONCTIONS, type CGISession, type CGIParticipant } from '@/types/cgi';
 import type { Task, TaskStatus } from '@/types/task';
@@ -30,6 +31,13 @@ const STATUS_MAP: Record<string, { label: string; color: string }> = {
   todo: { label: 'À faire', color: 'bg-slate-100 text-slate-700 border-slate-300' },
   'in-progress': { label: 'En cours', color: 'bg-blue-100 text-blue-700 border-blue-300' },
   done: { label: 'Fait', color: 'bg-emerald-100 text-emerald-700 border-emerald-300' },
+};
+
+const CHANGE_LABELS: Record<string, { label: string; color: string }> = {
+  created: { label: 'Ajoutée', color: 'bg-green-100 text-green-700' },
+  status_changed: { label: 'Statut modifié', color: 'bg-blue-100 text-blue-700' },
+  updated: { label: 'Modifiée', color: 'bg-amber-100 text-amber-700' },
+  deleted: { label: 'Supprimée', color: 'bg-red-100 text-red-700' },
 };
 
 const NONE = '__none__';
@@ -92,7 +100,7 @@ export default function ITComiteGI() {
 
           {/* ── Tab: Plan d'actions (transversal) ── */}
           <TabsContent value="actions" className="flex-1 overflow-y-auto p-6 mt-0">
-            <AllActionsTable isAdmin={isAdmin} sessions={sessions} />
+            <ActionsTableView isAdmin={isAdmin} sessions={sessions} contextSessionId={null} />
           </TabsContent>
 
           {/* ── Tab: Séances ── */}
@@ -136,11 +144,12 @@ export default function ITComiteGI() {
               )}
             </div>
 
-            {/* Right panel — session detail + actions */}
+            {/* Right panel — session detail + full action plan */}
             <div className="flex-1 overflow-y-auto p-6">
               {selected ? (
                 <SessionDetail
                   session={selected}
+                  sessions={sessions}
                   isAdmin={isAdmin}
                   onEdit={() => setEditingSession(selected)}
                   onDelete={() => {
@@ -160,7 +169,6 @@ export default function ITComiteGI() {
         </Tabs>
       </div>
 
-      {/* Dialog — new session */}
       <SessionFormDialog
         open={showNewSession}
         onOpenChange={setShowNewSession}
@@ -171,7 +179,6 @@ export default function ITComiteGI() {
         isSubmitting={createSession.isPending}
       />
 
-      {/* Dialog — edit session */}
       {editingSession && (
         <SessionFormDialog
           open
@@ -188,9 +195,17 @@ export default function ITComiteGI() {
   );
 }
 
-// ─── All Actions Table (transversal) ────────────────────────────
+// ─── Actions Table View (shared between tabs) ───────────────────
 
-function AllActionsTable({ isAdmin, sessions }: { isAdmin: boolean; sessions: CGISession[] }) {
+function ActionsTableView({
+  isAdmin,
+  sessions,
+  contextSessionId,
+}: {
+  isAdmin: boolean;
+  sessions: CGISession[];
+  contextSessionId: string | null;
+}) {
   const { data: actions = [], isLoading } = useAllCGIActions();
   const updateAction = useUpdateCGIAction();
   const deleteAction = useDeleteCGIAction();
@@ -317,7 +332,7 @@ function AllActionsTable({ isAdmin, sessions }: { isAdmin: boolean; sessions: CG
                           <Select
                             value={a.status}
                             onValueChange={(v) =>
-                              updateAction.mutate({ id: a.id, status: v as TaskStatus })
+                              updateAction.mutate({ id: a.id, contextSessionId: contextSessionId ?? undefined, status: v as TaskStatus })
                             }
                           >
                             <SelectTrigger className="h-7 text-[11px] w-[100px]">
@@ -338,7 +353,7 @@ function AllActionsTable({ isAdmin, sessions }: { isAdmin: boolean; sessions: CG
                               className="h-6 w-6 text-muted-foreground hover:text-destructive"
                               onClick={() => {
                                 if (confirm('Supprimer cette action ?')) {
-                                  deleteAction.mutate({ id: a.id });
+                                  deleteAction.mutate({ id: a.id, contextSessionId: contextSessionId ?? undefined });
                                 }
                               }}
                             >
@@ -356,13 +371,13 @@ function AllActionsTable({ isAdmin, sessions }: { isAdmin: boolean; sessions: CG
         </CardContent>
       </Card>
 
-      {/* Dialog — new action (needs a session) */}
       {sessions.length > 0 && (
         <ActionFormDialog
           open={showNew}
           onOpenChange={setShowNew}
           sessionId={sessions[0].id}
           sessions={sessions}
+          contextSessionId={contextSessionId}
           onSubmit={async (data) => {
             await createAction.mutateAsync(data);
             setShowNew(false);
@@ -378,11 +393,13 @@ function AllActionsTable({ isAdmin, sessions }: { isAdmin: boolean; sessions: CG
 
 function SessionDetail({
   session,
+  sessions,
   isAdmin,
   onEdit,
   onDelete,
 }: {
   session: CGISession;
+  sessions: CGISession[];
   isAdmin: boolean;
   onEdit: () => void;
   onDelete: () => void;
@@ -390,7 +407,7 @@ function SessionDetail({
   const participants = session.participants as CGIParticipant[];
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6 max-w-6xl">
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
@@ -429,7 +446,7 @@ function SessionDetail({
               {participants.map((p, i) => (
                 <Badge key={i} variant="secondary" className="text-xs gap-1">
                   {p.fonction}
-                  {p.profile_id && <ProfileName profileId={p.profile_id} />}
+                  {p.profile_id && <> (<ProfileName profileId={p.profile_id} />)</>}
                 </Badge>
               ))}
             </div>
@@ -451,116 +468,103 @@ function SessionDetail({
         </Card>
       )}
 
-      {/* Actions de cette séance */}
-      <SessionActionsTable sessionId={session.id} isAdmin={isAdmin} />
+      {/* Journal des modifications */}
+      <ChangeLog sessionId={session.id} />
+
+      {/* Plan d'actions complet (éditable dans le contexte de cette séance) */}
+      <div>
+        <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+          <ListChecks className="h-4 w-4 text-sky-500" />
+          Plan d'actions — revue lors de cette séance
+        </h3>
+        <ActionsTableView isAdmin={isAdmin} sessions={sessions} contextSessionId={session.id} />
+      </div>
     </div>
   );
 }
 
-// ─── Session Actions Table ──────────────────────────────────────
+// ─── Change Log ─────────────────────────────────────────────────
 
-function SessionActionsTable({ sessionId, isAdmin }: { sessionId: string; isAdmin: boolean }) {
-  const { data: actions = [], isLoading } = useCGIActions(sessionId);
-  const createAction = useCreateCGIAction();
-  const updateAction = useUpdateCGIAction();
-  const deleteAction = useDeleteCGIAction();
-  const [showNew, setShowNew] = useState(false);
+function ChangeLog({ sessionId }: { sessionId: string }) {
+  const { data: changes = [], isLoading } = useCGIChanges(sessionId);
+
+  if (isLoading) return <Skeleton className="h-20" />;
+  if (changes.length === 0) {
+    return (
+      <Card>
+        <CardHeader className="py-3 px-4">
+          <CardTitle className="text-xs uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+            <History className="h-3.5 w-3.5" /> Journal des modifications
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="px-4 pb-3">
+          <p className="text-xs text-muted-foreground">Aucune modification enregistrée pour cette séance.</p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
-      <CardHeader className="py-3 px-4 flex-row items-center justify-between">
+      <CardHeader className="py-3 px-4">
         <CardTitle className="text-xs uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
-          <ChevronRight className="h-3.5 w-3.5" /> Actions de cette séance
-          <Badge variant="outline" className="ml-1 text-[10px]">{actions.length}</Badge>
+          <History className="h-3.5 w-3.5" /> Journal des modifications
+          <Badge variant="outline" className="ml-1 text-[10px]">{changes.length}</Badge>
         </CardTitle>
-        {isAdmin && (
-          <Button size="sm" variant="outline" className="h-7 gap-1 text-xs" onClick={() => setShowNew(true)}>
-            <Plus className="h-3.5 w-3.5" /> Action
-          </Button>
-        )}
       </CardHeader>
-      <CardContent className="px-0 pb-0">
-        {isLoading ? (
-          <div className="p-4"><Skeleton className="h-12" /></div>
-        ) : actions.length === 0 ? (
-          <p className="text-xs text-muted-foreground text-center py-6">Aucune action pour cette séance.</p>
-        ) : (
-          <div className="overflow-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/40 text-xs text-muted-foreground">
-                  <th className="text-left px-3 py-2 font-medium">Action</th>
-                  <th className="text-left px-3 py-2 font-medium w-[120px]">Fonction</th>
-                  <th className="text-left px-3 py-2 font-medium w-[100px]">Échéance</th>
-                  <th className="text-left px-3 py-2 font-medium w-[100px]">Statut</th>
-                  {isAdmin && <th className="w-[60px]" />}
-                </tr>
-              </thead>
-              <tbody>
-                {actions.map((a) => {
-                  const md = (a as any).module_data as Record<string, any> | null;
-                  const fonction = md?.responsable_fonction ?? '—';
-                  const sc = STATUS_MAP[a.status] ?? STATUS_MAP.todo;
-                  return (
-                    <tr key={a.id} className="border-b hover:bg-muted/20 transition-colors">
-                      <td className="px-3 py-2.5 font-medium">{a.title}</td>
-                      <td className="px-3 py-2.5">
-                        <Badge variant="secondary" className="text-[10px]">{fonction}</Badge>
-                      </td>
-                      <td className="px-3 py-2.5 text-xs text-muted-foreground">{fmtDate(a.due_date)}</td>
-                      <td className="px-3 py-2.5">
-                        <Select
-                          value={a.status}
-                          onValueChange={(v) =>
-                            updateAction.mutate({ id: a.id, sessionId, status: v as TaskStatus })
-                          }
-                        >
-                          <SelectTrigger className="h-7 text-[11px] w-[100px]">
-                            <Badge className={cn(sc.color, 'border text-[10px]')}>{sc.label}</Badge>
-                          </SelectTrigger>
-                          <SelectContent>
-                            {Object.entries(STATUS_MAP).map(([k, v]) => (
-                              <SelectItem key={k} value={k}>{v.label}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </td>
-                      {isAdmin && (
-                        <td className="px-2 py-2.5 text-right">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                            onClick={() => {
-                              if (confirm('Supprimer cette action ?')) {
-                                deleteAction.mutate({ id: a.id, sessionId });
-                              }
-                            }}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </td>
-                      )}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+      <CardContent className="px-4 pb-3">
+        <div className="space-y-2">
+          {changes.map((c) => (
+            <ChangeRow key={c.id} change={c} />
+          ))}
+        </div>
       </CardContent>
-
-      <ActionFormDialog
-        open={showNew}
-        onOpenChange={setShowNew}
-        sessionId={sessionId}
-        onSubmit={async (data) => {
-          await createAction.mutateAsync(data);
-          setShowNew(false);
-        }}
-        isSubmitting={createAction.isPending}
-      />
     </Card>
+  );
+}
+
+function ChangeRow({ change }: { change: CGIActionChange }) {
+  const cl = CHANGE_LABELS[change.change_type] ?? CHANGE_LABELS.updated;
+  const title = change.new_values?.title ?? change.old_values?.title ?? '—';
+
+  const details: string[] = [];
+  if (change.change_type === 'status_changed') {
+    const oldS = STATUS_MAP[change.old_values?.status]?.label ?? change.old_values?.status;
+    const newS = STATUS_MAP[change.new_values?.status]?.label ?? change.new_values?.status;
+    if (oldS && newS) details.push(`${oldS} → ${newS}`);
+  } else if (change.change_type === 'updated' && change.old_values && change.new_values) {
+    for (const key of Object.keys(change.new_values)) {
+      if (key === 'status') {
+        const oldS = STATUS_MAP[change.old_values[key]]?.label ?? change.old_values[key];
+        const newS = STATUS_MAP[change.new_values[key]]?.label ?? change.new_values[key];
+        details.push(`Statut : ${oldS} → ${newS}`);
+      } else if (key === 'due_date') {
+        details.push(`Échéance : ${fmtDate(change.old_values[key])} → ${fmtDate(change.new_values[key])}`);
+      } else if (key === 'title') {
+        details.push(`Titre modifié`);
+      } else {
+        details.push(`${key} modifié`);
+      }
+    }
+  } else if (change.change_type === 'created') {
+    details.push(`Nouvelle action créée`);
+  } else if (change.change_type === 'deleted') {
+    details.push(`Action supprimée`);
+  }
+
+  return (
+    <div className="flex items-start gap-2 text-xs">
+      <Badge className={cn(cl.color, 'text-[10px] shrink-0 mt-0.5')}>{cl.label}</Badge>
+      <div className="flex-1 min-w-0">
+        <span className="font-medium">{title}</span>
+        {details.length > 0 && (
+          <span className="text-muted-foreground ml-1.5">— {details.join(' · ')}</span>
+        )}
+      </div>
+      <span className="text-[10px] text-muted-foreground shrink-0">
+        {change.changed_by && <ProfileName profileId={change.changed_by} />}
+      </span>
+    </div>
   );
 }
 
@@ -693,6 +697,7 @@ function ActionFormDialog({
   onOpenChange,
   sessionId,
   sessions,
+  contextSessionId,
   onSubmit,
   isSubmitting,
 }: {
@@ -700,11 +705,12 @@ function ActionFormDialog({
   onOpenChange: (open: boolean) => void;
   sessionId: string;
   sessions?: CGISession[];
+  contextSessionId?: string | null;
   onSubmit: (data: any) => Promise<void>;
   isSubmitting: boolean;
 }) {
   const [title, setTitle] = useState('');
-  const [fonction, setFonction] = useState<string>(CGI_FONCTIONS[0]);
+  const [fonction, setFonction] = useState('');
   const [assigneeId, setAssigneeId] = useState<string | null>(null);
   const [dueDate, setDueDate] = useState('');
   const [selectedSession, setSelectedSession] = useState(sessionId);
@@ -719,7 +725,7 @@ function ActionFormDialog({
 
   const reset = () => {
     setTitle('');
-    setFonction(CGI_FONCTIONS[0]);
+    setFonction('');
     setAssigneeId(null);
     setDueDate('');
     setSelectedSession(sessionId);
@@ -741,7 +747,7 @@ function ActionFormDialog({
 
           {sessions && sessions.length > 1 && (
             <div className="space-y-1">
-              <Label className="text-xs">Séance</Label>
+              <Label className="text-xs">Séance d'origine</Label>
               <Select value={selectedSession} onValueChange={setSelectedSession}>
                 <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -788,8 +794,9 @@ function ActionFormDialog({
               disabled={isSubmitting || !title.trim()}
               onClick={() => void onSubmit({
                 sessionId: selectedSession,
+                contextSessionId: contextSessionId ?? undefined,
                 title: title.trim(),
-                responsable_fonction: fonction,
+                responsable_fonction: fonction || 'Divers',
                 assignee_id: assigneeId,
                 due_date: dueDate || null,
               })}
@@ -813,5 +820,5 @@ function ProfileName({ profileId }: { profileId: string }) {
       .then(({ data }) => setName(data?.display_name ?? null));
   }, [profileId]);
   if (!name) return null;
-  return <span className="text-muted-foreground">{name}</span>;
+  return <span>{name}</span>;
 }

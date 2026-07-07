@@ -11,6 +11,7 @@ const db = () => supabase as any;
 const SESSION_KEY = ['cgi-sessions'];
 const ALL_ACTIONS_KEY = ['cgi-all-actions'];
 const ACTIONS_KEY = (sessionId: string) => ['cgi-actions', sessionId];
+const CHANGES_KEY = (sessionId: string) => ['cgi-changes', sessionId];
 
 function useActiveProfile() {
   const { profile: authProfile, user } = useAuth();
@@ -138,7 +139,7 @@ export function useAllCGIActions() {
   return query;
 }
 
-// ─── Actions (tasks with module_code='cgi') ─────────────────────
+// ─── Actions by session ─────────────────────────────────────────
 
 export function useCGIActions(sessionId: string | null) {
   const qc = useQueryClient();
@@ -176,6 +177,57 @@ export function useCGIActions(sessionId: string | null) {
   return query;
 }
 
+// ─── Changes history per session ────────────────────────────────
+
+export interface CGIActionChange {
+  id: string;
+  session_id: string | null;
+  task_id: string | null;
+  change_type: 'created' | 'status_changed' | 'updated' | 'deleted';
+  old_values: Record<string, any> | null;
+  new_values: Record<string, any> | null;
+  changed_by: string | null;
+  created_at: string;
+}
+
+export function useCGIChanges(sessionId: string | null) {
+  return useQuery<CGIActionChange[]>({
+    queryKey: CHANGES_KEY(sessionId ?? ''),
+    enabled: !!sessionId,
+    queryFn: async () => {
+      const { data, error } = await db()
+        .from('cgi_action_changes')
+        .select('*')
+        .eq('session_id', sessionId!)
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as CGIActionChange[];
+    },
+    staleTime: 15_000,
+  });
+}
+
+async function logChange(
+  sessionId: string | null,
+  taskId: string,
+  changeType: CGIActionChange['change_type'],
+  oldValues: Record<string, any> | null,
+  newValues: Record<string, any> | null,
+  changedBy: string | null,
+) {
+  if (!sessionId) return;
+  await db().from('cgi_action_changes').insert({
+    session_id: sessionId,
+    task_id: taskId,
+    change_type: changeType,
+    old_values: oldValues,
+    new_values: newValues,
+    changed_by: changedBy,
+  });
+}
+
+// ─── Create action ──────────────────────────────────────────────
+
 export interface CreateCGIActionInput {
   sessionId: string;
   title: string;
@@ -189,7 +241,7 @@ export function useCreateCGIAction() {
   const qc = useQueryClient();
   const { profile, user } = useActiveProfile();
   return useMutation({
-    mutationFn: async (input: CreateCGIActionInput) => {
+    mutationFn: async (input: CreateCGIActionInput & { contextSessionId?: string }) => {
       const moduleData: Record<string, unknown> = {
         session_id: input.sessionId,
         responsable_fonction: input.responsable_fonction,
@@ -215,34 +267,91 @@ export function useCreateCGIAction() {
         .select('*')
         .single();
       if (error) throw error;
+
+      const logSession = input.contextSessionId ?? input.sessionId;
+      await logChange(logSession, (data as any).id, 'created', null, {
+        title: input.title,
+        responsable_fonction: input.responsable_fonction,
+        assignee_id: input.assignee_id ?? null,
+        due_date: input.due_date ?? null,
+      }, profile?.id ?? null);
+
       qc.invalidateQueries({ queryKey: ACTIONS_KEY(input.sessionId) });
       qc.invalidateQueries({ queryKey: ALL_ACTIONS_KEY });
+      qc.invalidateQueries({ queryKey: CHANGES_KEY(logSession) });
       return data as Task;
     },
   });
 }
 
+// ─── Update action (with change tracking) ───────────────────────
+
 export function useUpdateCGIAction() {
   const qc = useQueryClient();
+  const { profile } = useActiveProfile();
   return useMutation({
-    mutationFn: async ({ id, sessionId, ...patch }: { id: string; sessionId?: string } & Record<string, any>) => {
+    mutationFn: async ({ id, sessionId, contextSessionId, ...patch }: {
+      id: string;
+      sessionId?: string;
+      contextSessionId?: string;
+    } & Record<string, any>) => {
+      let oldValues: Record<string, any> | null = null;
+      if (contextSessionId) {
+        const { data: existing } = await supabase.from('tasks').select('title, status, due_date, assignee_id, description').eq('id', id).maybeSingle();
+        if (existing) oldValues = existing as any;
+      }
+
       const { error } = await supabase
         .from('tasks')
         .update(patch as any)
         .eq('id', id);
       if (error) throw error;
+
+      if (contextSessionId && oldValues) {
+        const changeType = patch.status && patch.status !== oldValues.status ? 'status_changed' : 'updated';
+        const newValues: Record<string, any> = {};
+        for (const key of Object.keys(patch)) {
+          if (key !== 'sessionId' && key !== 'contextSessionId' && oldValues[key] !== patch[key]) {
+            newValues[key] = patch[key];
+          }
+        }
+        if (Object.keys(newValues).length > 0) {
+          const changedOld: Record<string, any> = {};
+          for (const key of Object.keys(newValues)) {
+            changedOld[key] = oldValues[key] ?? null;
+          }
+          await logChange(contextSessionId, id, changeType, changedOld, newValues, profile?.id ?? null);
+          qc.invalidateQueries({ queryKey: CHANGES_KEY(contextSessionId) });
+        }
+      }
+
       if (sessionId) qc.invalidateQueries({ queryKey: ACTIONS_KEY(sessionId) });
       qc.invalidateQueries({ queryKey: ALL_ACTIONS_KEY });
     },
   });
 }
 
+// ─── Delete action ──────────────────────────────────────────────
+
 export function useDeleteCGIAction() {
   const qc = useQueryClient();
+  const { profile } = useActiveProfile();
   return useMutation({
-    mutationFn: async ({ id, sessionId }: { id: string; sessionId?: string }) => {
+    mutationFn: async ({ id, sessionId, contextSessionId }: { id: string; sessionId?: string; contextSessionId?: string }) => {
+      let oldValues: Record<string, any> | null = null;
+      if (contextSessionId) {
+        const { data: existing } = await supabase.from('tasks').select('title, status').eq('id', id).maybeSingle();
+        if (existing) oldValues = existing as any;
+      }
+
       const { error } = await supabase.from('tasks').delete().eq('id', id);
       if (error) throw error;
+
+      if (contextSessionId) {
+        await logChange(contextSessionId, id, 'deleted', oldValues, null, profile?.id ?? null);
+        qc.invalidateQueries({ queryKey: CHANGES_KEY(contextSessionId) });
+      }
+
       if (sessionId) qc.invalidateQueries({ queryKey: ACTIONS_KEY(sessionId) });
       qc.invalidateQueries({ queryKey: ALL_ACTIONS_KEY });
     },
