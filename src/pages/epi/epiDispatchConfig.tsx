@@ -79,24 +79,31 @@ const deleteRequest = async (id: string, refetch: () => void) => {
 
 function exportSyntheseFournisseur(requests: EPIRequest[]) {
   const actives = requests.filter(r => !EPI_TERMINAL.includes(r.status));
-  const map = new Map<string, { ref: string; designation: string; taille: string; qte: number; prix: number }>();
+  const map = new Map<string, { ref: string; designation: string; taille: string; qte: number; prix: number; qteCmdee: number; qteAttribuee: number }>();
   for (const r of actives) {
     for (const l of r.lignes ?? []) {
       const key = `${l.ref_sycomore}|${l.taille}`;
       const existing = map.get(key);
       if (existing) {
         existing.qte += l.quantite;
+        if (l.statut === 'commandee') existing.qteCmdee += l.quantite;
+        if (l.statut === 'attribuee') existing.qteAttribuee += l.quantite;
       } else {
-        map.set(key, { ref: l.ref_sycomore, designation: l.designation, taille: l.taille, qte: l.quantite, prix: l.prix_unitaire });
+        map.set(key, {
+          ref: l.ref_sycomore, designation: l.designation, taille: l.taille,
+          qte: l.quantite, prix: l.prix_unitaire,
+          qteCmdee: l.statut === 'commandee' ? l.quantite : 0,
+          qteAttribuee: l.statut === 'attribuee' ? l.quantite : 0,
+        });
       }
     }
   }
   const rows = Array.from(map.values()).sort((a, b) => a.ref.localeCompare(b.ref));
-  const header = 'Référence\tDésignation\tTaille\tQuantité\tPrix unit.\tTotal HT';
+  const header = 'Référence\tDésignation\tTaille\tQté totale\tQté commandée\tQté attribuée\tPrix unit.\tTotal HT';
   const csv = [header, ...rows.map(r =>
-    `${r.ref}\t${r.designation}\t${r.taille}\t${r.qte}\t${r.prix.toFixed(2)}\t${(r.qte * r.prix).toFixed(2)}`,
+    `${r.ref}\t${r.designation}\t${r.taille}\t${r.qte}\t${r.qteCmdee}\t${r.qteAttribuee}\t${r.prix.toFixed(2)}\t${(r.qte * r.prix).toFixed(2)}`,
   )].join('\n');
-  downloadTsv(csv, `synthese_fournisseur_epi_${new Date().toISOString().slice(0, 10)}.xls`);
+  downloadTsv(csv, `commandes_fournisseur_epi_${new Date().toISOString().slice(0, 10)}.xls`);
 }
 
 function exportSyntheseFiliale(requests: EPIRequest[]) {
@@ -120,14 +127,33 @@ function exportSyntheseFiliale(requests: EPIRequest[]) {
 
 function exportSyntheseIndividuelle(requests: EPIRequest[]) {
   const actives = requests.filter(r => !EPI_TERMINAL.includes(r.status));
-  const lines: string[] = ['Collaborateur\tFiliale\tProfil\tRéférence\tDésignation\tTaille\tQuantité\tPrix unit.\tMontant HT'];
+  const lines: string[] = ['Collaborateur\tFiliale\tProfil\tRéférence\tDésignation\tTaille\tQuantité\tPrix unit.\tMontant HT\tStatut demande\tRéf. devis\tRéf. commande'];
   for (const r of actives) {
     const collab = `${r.beneficiaire_prenom ?? ''} ${r.beneficiaire_nom ?? ''}`.trim();
     for (const l of r.lignes ?? []) {
-      lines.push(`${collab}\t${r.filiale ?? ''}\t${r.profil_epi ? EPI_PROFIL_LABELS[r.profil_epi] : ''}\t${l.ref_sycomore}\t${l.designation}\t${l.taille}\t${l.quantite}\t${(l.prix_unitaire + l.prix_flocage).toFixed(2)}\t${(l.quantite * (l.prix_unitaire + l.prix_flocage)).toFixed(2)}`);
+      lines.push(`${collab}\t${r.filiale ?? ''}\t${r.profil_epi ? EPI_PROFIL_LABELS[r.profil_epi] : ''}\t${l.ref_sycomore}\t${l.designation}\t${l.taille}\t${l.quantite}\t${(l.prix_unitaire + l.prix_flocage).toFixed(2)}\t${(l.quantite * (l.prix_unitaire + l.prix_flocage)).toFixed(2)}\t${EPI_STATUS_LABELS[r.status] ?? r.status}\t${r.ref_devis_divalto ?? ''}\t${r.ref_commande_divalto ?? ''}`);
     }
   }
   downloadTsv(lines.join('\n'), `synthese_individuelle_epi_${new Date().toISOString().slice(0, 10)}.xls`);
+}
+
+async function exportBilanAttributions() {
+  try {
+    const { data, error } = await supabase
+      .from('epi_attributions' as any)
+      .select('*, profiles:beneficiaire_id(display_name, company), article:article_id(designation, categorie), taille:taille_id(taille, ref_sycomore)')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    const rows = (data || []) as any[];
+    const lines: string[] = ['Collaborateur\tFiliale\tDésignation\tCatégorie\tTaille\tRéf. Sycomore\tQuantité\tCampagne\tDate attribution'];
+    for (const r of rows) {
+      lines.push(`${r.profiles?.display_name ?? '—'}\t${r.profiles?.company ?? '—'}\t${r.article?.designation ?? '—'}\t${r.article?.categorie ?? '—'}\t${r.taille?.taille ?? '—'}\t${r.taille?.ref_sycomore ?? '—'}\t${r.quantite}\t${r.campagne_annee ?? '—'}\t${r.created_at ? r.created_at.slice(0, 10) : '—'}`);
+    }
+    downloadTsv(lines.join('\n'), `bilan_attributions_epi_${new Date().toISOString().slice(0, 10)}.xls`);
+    toast.success(`Export bilan : ${rows.length} attribution(s)`);
+  } catch (e: any) {
+    toast.error(`Erreur export : ${e.message}`);
+  }
 }
 
 function downloadTsv(content: string, filename: string) {
@@ -306,13 +332,16 @@ function EPIHeaderActions() {
   return (
     <div className="flex gap-2 flex-wrap">
       <Button size="sm" variant="outline" onClick={() => exportSyntheseFournisseur(requests)}>
-        <FileSpreadsheet className="h-3 w-3 mr-1" /> Synthèse fournisseur
+        <FileSpreadsheet className="h-3 w-3 mr-1" /> Commandes fournisseur
       </Button>
       <Button size="sm" variant="outline" onClick={() => exportSyntheseFiliale(requests)}>
-        <FileText className="h-3 w-3 mr-1" /> Synthèse par filiale
+        <FileText className="h-3 w-3 mr-1" /> Devis par filiale
       </Button>
       <Button size="sm" variant="outline" onClick={() => exportSyntheseIndividuelle(requests)}>
-        <User className="h-3 w-3 mr-1" /> Synthèse individuelle
+        <User className="h-3 w-3 mr-1" /> Listing individuel
+      </Button>
+      <Button size="sm" variant="outline" onClick={() => void exportBilanAttributions()}>
+        <Clock className="h-3 w-3 mr-1" /> Bilan attributions
       </Button>
     </div>
   );
