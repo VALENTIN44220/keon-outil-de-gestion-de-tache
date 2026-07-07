@@ -145,6 +145,14 @@ export interface ModuleDispatchConfig<TRequest extends { id?: string; status?: s
   /** Profile ids supplementaires a charger (referent metier, validateurs...). Default: aucun. */
   extraProfileIds?: (r: TRequest) => Array<string | null | undefined>;
 
+  // Onglets supplementaires apres Demandes / Analyse
+  extraTabs?: Array<{
+    value: string;
+    label: string;
+    icon?: ReactNode;
+    content: (props: { requests: TRequest[]; isAdmin: boolean; refetch: () => void }) => ReactNode;
+  }>;
+
   // Header extras (boutons supplementaires a cote de "Nouvelle demande")
   HeaderExtras?: (props: { isAdmin: boolean; refetch: () => void }) => ReactNode;
 
@@ -333,6 +341,11 @@ export function ModuleDispatchView<
                 <TabsTrigger value="analyse" className="h-7 px-3 gap-1.5 text-xs data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-md">
                   <BarChart3 className="h-3.5 w-3.5" /> Analyse
                 </TabsTrigger>
+                {config.extraTabs?.map(tab => (
+                  <TabsTrigger key={tab.value} value={tab.value} className="h-7 px-3 gap-1.5 text-xs data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-md">
+                    {tab.icon} {tab.label}
+                  </TabsTrigger>
+                ))}
               </TabsList>
 
               <TabsContent value="demandes" className="space-y-3 mt-3">
@@ -470,6 +483,12 @@ export function ModuleDispatchView<
                   }}
                 />
               </TabsContent>
+
+              {config.extraTabs?.map(tab => (
+                <TabsContent key={tab.value} value={tab.value} className="space-y-4 mt-4">
+                  {tab.content({ requests, isAdmin, refetch })}
+                </TabsContent>
+              ))}
             </Tabs>
           </div>
         </main>
