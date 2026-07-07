@@ -23,6 +23,9 @@ import {
   EPI_PROFIL_LABELS, EPI_TYPE_DEMANDE_LABELS, EPI_CATEGORIE_LABELS, EPI_PROFILS,
 } from '@/types/epi';
 
+const EPI_PROCESS_TEMPLATE_ID = '11111111-1111-4111-8111-111111111301';
+const EPI_SUB_PROCESS_TEMPLATE_ID = '22222222-2222-4222-8222-222222222301';
+
 interface SelectedLine {
   articleId: string;
   tailleId: string;
@@ -144,6 +147,17 @@ export default function NewEPIRequest() {
       const benefNom = benef?.display_name ?? '';
       const title = `EPI ${typeDemande === 'dotation_annuelle' ? 'Dotation' : 'Ponctuelle'} — ${benefNom}`;
 
+      // Résoudre l'assignataire par défaut depuis le sub_process_template
+      let defaultAssigneeId: string | null = null;
+      const { data: spData } = await supabase
+        .from('sub_process_templates' as any)
+        .select('target_assignee_id')
+        .eq('id', EPI_SUB_PROCESS_TEMPLATE_ID)
+        .single();
+      if (spData?.target_assignee_id) {
+        defaultAssigneeId = spData.target_assignee_id;
+      }
+
       const moduleData: Record<string, any> = {
         type_demande: typeDemande,
         profil_epi: profilEpi,
@@ -163,11 +177,12 @@ export default function NewEPIRequest() {
           title,
           description: justification || null,
           requester_id: profile.id,
-          assignee_id: beneficiaireId !== profile.id ? beneficiaireId : null,
+          assignee_id: defaultAssigneeId,
           user_id: user.id,
           due_date: dateSouhaitee || null,
           module_code: 'epi' as any,
           module_data: moduleData,
+          source_process_template_id: EPI_PROCESS_TEMPLATE_ID,
         })
         .select('id')
         .single();

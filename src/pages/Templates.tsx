@@ -67,7 +67,7 @@ const CATEGORIES: Category[] = [
   { key: 'maintenance', label: 'Maintenance',               icon: Wrench,       iconClass: 'bg-orange-100 text-orange-600',
     match: (name) => /^Maintenance|^SERVICE MAINTENANCE/i.test(name) },
   { key: 'logistique',  label: 'Logistique / Transport',    icon: Truck,        iconClass: 'bg-sky-100 text-sky-600',
-    match: (name) => /^Logistique|^TRANSPORT/i.test(name) },
+    match: (name) => /^Logistique|^TRANSPORT|^EPI\b/i.test(name) },
   { key: 'rh',          label: 'Ressources Humaines',       icon: UsersIcon,    iconClass: 'bg-pink-100 text-pink-600',
     match: (name) => /^RH\b|^RESSOURCES HUMAINES|^ONBOARDING/i.test(name) },
   { key: 'achat',       label: 'Achats / Fournisseurs',     icon: ShoppingCart, iconClass: 'bg-emerald-100 text-emerald-600',
