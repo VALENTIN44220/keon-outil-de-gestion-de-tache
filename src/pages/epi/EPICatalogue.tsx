@@ -7,8 +7,11 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { ShoppingBag, Search, Plus, FileText, Loader2 } from 'lucide-react';
+import { ShoppingBag, Search, Plus, FileText, Loader2, Upload, Trash2 } from 'lucide-react';
 import { useEPICatalogue } from '@/hooks/useEPICatalogue';
+import { usePermissionsContext } from '@/contexts/PermissionsContext';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import type { EPICategorie, EPICatalogueItem } from '@/types/epi';
 import { EPI_CATEGORIE_LABELS, EPI_CATEGORIES } from '@/types/epi';
@@ -22,7 +25,10 @@ export default function EPICatalogue() {
   const [search, setSearch] = useState('');
   const [categorie, setCategorie] = useState<EPICategorie | 'all'>('all');
 
-  const { articles, isLoading } = useEPICatalogue(
+  const { effectivePermissions } = usePermissionsContext();
+  const canManage = effectivePermissions.can_manage_epi;
+
+  const { articles, isLoading, refetch } = useEPICatalogue(
     undefined,
     categorie !== 'all' ? categorie : undefined,
   );
@@ -90,7 +96,7 @@ export default function EPICatalogue() {
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mt-4">
                   {filtered.map((art) => (
-                    <CatalogueCard key={art.id} article={art} />
+                    <CatalogueCard key={art.id} article={art} canManage={canManage} onUpdate={refetch} />
                   ))}
                 </div>
               )}
@@ -102,14 +108,49 @@ export default function EPICatalogue() {
   );
 }
 
-function CatalogueCard({ article: art }: { article: EPICatalogueItem }) {
+function CatalogueCard({ article: art, canManage, onUpdate }: { article: EPICatalogueItem; canManage: boolean; onUpdate: () => void }) {
   const [expanded, setExpanded] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   const prixMin = art.tailles.length > 0 ? Math.min(...art.tailles.map(t => t.prix_achat)) : 0;
   const prixMax = art.tailles.length > 0 ? Math.max(...art.tailles.map(t => t.prix_achat)) : 0;
   const prixLabel = prixMin === prixMax
     ? fmtEur(prixMin)
     : `${fmtEur(prixMin)} – ${fmtEur(prixMax)}`;
+
+  const handleUploadFT = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    e.stopPropagation();
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const slug = art.designation.replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_');
+      const ext = file.name.split('.').pop() ?? 'pdf';
+      const path = `FT_${slug}.${ext}`;
+      const { error: upErr } = await supabase.storage.from('epi-fiches-techniques').upload(path, file, { upsert: true });
+      if (upErr) throw upErr;
+      const { data: { publicUrl } } = supabase.storage.from('epi-fiches-techniques').getPublicUrl(path);
+      await supabase.from('epi_articles' as any).update({ fiche_technique_url: publicUrl }).eq('id', art.id);
+      toast.success('Fiche technique ajoutée');
+      onUpdate();
+    } catch (err: any) {
+      toast.error(`Erreur upload : ${err.message}`);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleRemoveFT = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm('Retirer la fiche technique de cet article ?')) return;
+    try {
+      await supabase.from('epi_articles' as any).update({ fiche_technique_url: null }).eq('id', art.id);
+      toast.success('Fiche technique retirée');
+      onUpdate();
+    } catch (err: any) {
+      toast.error(`Erreur : ${err.message}`);
+    }
+  };
 
   return (
     <Card
@@ -156,17 +197,40 @@ function CatalogueCard({ article: art }: { article: EPICatalogueItem }) {
                 ))}
               </div>
             </div>
-            {art.fiche_technique_url && (
-              <a
-                href={art.fiche_technique_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-primary hover:underline"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <FileText className="h-3 w-3" /> Fiche technique
-              </a>
-            )}
+
+            <div className="flex items-center gap-2 flex-wrap">
+              {art.fiche_technique_url && (
+                <a
+                  href={art.fiche_technique_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-primary hover:underline"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <FileText className="h-3 w-3" /> Fiche technique
+                </a>
+              )}
+              {canManage && (
+                <>
+                  <label
+                    className="inline-flex items-center gap-1 text-amber-600 hover:text-amber-800 cursor-pointer"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {uploading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
+                    {art.fiche_technique_url ? 'Remplacer' : 'Ajouter FT'}
+                    <input type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden" onChange={handleUploadFT} disabled={uploading} />
+                  </label>
+                  {art.fiche_technique_url && (
+                    <button
+                      className="inline-flex items-center gap-1 text-destructive hover:text-destructive/80"
+                      onClick={handleRemoveFT}
+                    >
+                      <Trash2 className="h-3 w-3" /> Retirer
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
           </div>
         )}
       </CardContent>
