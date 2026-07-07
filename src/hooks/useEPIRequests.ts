@@ -21,7 +21,12 @@ export function useEPIRequests() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setRequests((data || []) as unknown as EPIRequest[]);
+      const parsed = ((data || []) as unknown as EPIRequest[]).map(r => ({
+        ...r,
+        montant_total: Number(r.montant_total) || 0,
+        nb_lignes: Number(r.nb_lignes) || 0,
+      }));
+      setRequests(parsed);
     } catch (e) {
       console.error('useEPIRequests:', e);
       toast.error('Erreur chargement demandes EPI');
