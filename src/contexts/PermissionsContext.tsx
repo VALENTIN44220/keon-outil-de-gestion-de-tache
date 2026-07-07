@@ -47,9 +47,11 @@ const DEFAULT_PERMISSIONS: EffectivePermissions = {
   can_access_rh: false,        // Déploiement contrôlé : activé par profil via Droits & Accès
   can_access_comm: false,      // Déploiement contrôlé : activé par profil via Droits & Accès
   can_access_client: false,    // Déploiement contrôlé : activé par profil via Droits & Accès
+  can_access_epi: true,        // EPI : tous peuvent consulter le catalogue et faire des demandes
   can_manage_smq: false,       // Pilote / admin uniquement
   can_manage_logistique: false, // Dispatch logistique / admin uniquement
   can_manage_maintenance: false, // Dispatch maintenance / admin uniquement
+  can_manage_epi: false,       // Dispatch EPI / admin uniquement
   can_edit_spv_data: false,    // Édition questionnaire SPV : activé par profil
   can_manage_questionnaire: false, // Gestion structure questionnaire : activé par profil
   // Transverse

@@ -202,6 +202,8 @@ const DEFAULT_PERMISSIONS: Record<string, boolean> = {
   can_manage_smq: false,
   can_manage_logistique: false,
   can_manage_maintenance: false,
+  can_access_epi: true,
+  can_manage_epi: false,
   // Transverse
   can_access_suppliers: false,
   can_access_templates: false,
