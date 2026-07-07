@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -6,10 +6,13 @@ import type { EPIRequest } from '@/types/epi';
 
 const TERMINAL_STATUSES = ['done', 'cancelled', 'refused'] as const;
 
+let _instanceCounter = 0;
+
 export function useEPIRequests() {
   const { user } = useAuth();
   const [requests, setRequests] = useState<EPIRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const instanceId = useRef(++_instanceCounter);
 
   const fetchRequests = useCallback(async () => {
     if (!user) return;
@@ -41,8 +44,9 @@ export function useEPIRequests() {
 
   useEffect(() => {
     if (!user) return;
+    const channelName = `epi-live-${user.id}-${instanceId.current}`;
     const ch = supabase
-      .channel(`epi-live-${user.id}`)
+      .channel(channelName)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks', filter: 'module_code=eq.epi' }, () => {
         void fetchRequests();
       })
