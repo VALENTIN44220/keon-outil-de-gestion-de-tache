@@ -11,6 +11,7 @@ import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { useEPIRequests } from '@/hooks/useEPIRequests';
+import { usePermissionsContext } from '@/contexts/PermissionsContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import type { TaskStats } from '@/types/task';
@@ -214,6 +215,8 @@ export const epiDispatchConfig: ModuleDispatchConfig<EPIRequest, {}> = {
 };
 
 function EPIRowActions({ request: r, ctx }: { request: EPIRequest; ctx: ModuleRowCtx }) {
+  const { effectivePermissions } = usePermissionsContext();
+  const canManage = effectivePermissions.can_manage_epi || ctx.isAdmin;
   const isAwaiting = r.status === 'todo';
 
   const handleValidate = async () => {
@@ -241,7 +244,7 @@ function EPIRowActions({ request: r, ctx }: { request: EPIRequest; ctx: ModuleRo
 
   return (
     <>
-      {isAwaiting && (
+      {isAwaiting && canManage && (
         <>
           <Button size="sm" variant="default" onClick={(e) => { e.stopPropagation(); void handleValidate(); }}>
             Valider
@@ -251,7 +254,7 @@ function EPIRowActions({ request: r, ctx }: { request: EPIRequest; ctx: ModuleRo
           </Button>
         </>
       )}
-      {ctx.isAdmin && (
+      {canManage && (
         <Button
           size="icon" variant="ghost" className="h-7 w-7 text-destructive"
           onClick={(e) => { e.stopPropagation(); deleteRequest(r.task_id, ctx.refetch); }}
@@ -273,6 +276,9 @@ function EPIDetailDialog({ request, open, onClose, refetch, isAdmin, profilesMap
   myProfileId?: string;
   profilesMap: Map<string, string>;
 }) {
+  const { effectivePermissions } = usePermissionsContext();
+  const canManage = effectivePermissions.can_manage_epi || isAdmin;
+
   const fmtDay = (iso: string | null | undefined) =>
     iso ? format(parseISO(iso), 'dd/MM/yyyy', { locale: fr }) : '—';
 
@@ -354,7 +360,7 @@ function EPIDetailDialog({ request, open, onClose, refetch, isAdmin, profilesMap
   ];
 
   const statusActions: DetailStatusAction[] = [];
-  if (request.status === 'todo') {
+  if (request.status === 'todo' && canManage) {
     statusActions.push({
       key: 'val',
       label: 'Valider',
@@ -377,7 +383,7 @@ function EPIDetailDialog({ request, open, onClose, refetch, isAdmin, profilesMap
         refetch();
       },
     });
-  } else if (request.status === 'in-progress') {
+  } else if (request.status === 'in-progress' && canManage) {
     statusActions.push({
       key: 'cmd',
       label: 'Marquer commandée',
