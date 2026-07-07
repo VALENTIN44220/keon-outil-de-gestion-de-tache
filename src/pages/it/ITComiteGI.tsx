@@ -9,9 +9,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   CalendarClock, Plus, Trash2, ChevronRight, Users, FileText,
-  Pencil, Check, X, Loader2,
+  Pencil, Loader2, ListChecks, Search,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -20,7 +21,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useUserRole } from '@/hooks/useUserRole';
 import {
   useCGISessions, useCreateCGISession, useUpdateCGISession, useDeleteCGISession,
-  useCGIActions, useCreateCGIAction, useUpdateCGIAction, useDeleteCGIAction,
+  useAllCGIActions, useCGIActions, useCreateCGIAction, useUpdateCGIAction, useDeleteCGIAction,
 } from '@/hooks/useCGI';
 import { CGI_FONCTIONS, type CGISession, type CGIParticipant } from '@/types/cgi';
 import type { Task, TaskStatus } from '@/types/task';
@@ -45,7 +46,7 @@ function trimLabel(t: string) {
 
 export default function ITComiteGI() {
   const { isAdmin } = useUserRole();
-  const { data: sessions = [], isLoading } = useCGISessions();
+  const { data: sessions = [], isLoading: sessionsLoading } = useCGISessions();
   const createSession = useCreateCGISession();
   const updateSession = useUpdateCGISession();
   const deleteSession = useDeleteCGISession();
@@ -59,91 +60,104 @@ export default function ITComiteGI() {
     [sessions, selectedId],
   );
 
-  useEffect(() => {
-    if (!selectedId && sessions.length > 0) setSelectedId(sessions[0].id);
-  }, [sessions, selectedId]);
-
   return (
     <Layout>
       <div className="flex flex-col h-full">
         {/* Header */}
         <div className="px-6 pt-6 pb-4 border-b bg-background/95 backdrop-blur">
-          <div className="flex items-start justify-between mb-2">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-gradient-to-br from-sky-500 to-cyan-500 text-white shadow-lg">
-                <Users className="h-5 w-5" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold tracking-tight">Comité de Gestion de l'Information</h1>
-                <p className="text-sm text-muted-foreground">
-                  {sessions.length} séance(s) enregistrée(s)
-                </p>
-              </div>
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-gradient-to-br from-sky-500 to-cyan-500 text-white shadow-lg">
+              <Users className="h-5 w-5" />
             </div>
-            {isAdmin && (
-              <Button onClick={() => setShowNewSession(true)} className="gap-2" size="sm">
-                <Plus className="h-4 w-4" /> Nouvelle séance
-              </Button>
-            )}
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight">Comité de Gestion de l'Information</h1>
+              <p className="text-sm text-muted-foreground">
+                Suivi transversal des actions du GT GInfo
+              </p>
+            </div>
           </div>
         </div>
 
-        <div className="flex-1 overflow-hidden flex">
-          {/* Left panel — sessions */}
-          <div className="w-80 border-r overflow-y-auto p-4 space-y-2 shrink-0">
-            {isLoading ? (
-              Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-20" />)
-            ) : sessions.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">Aucune séance.</p>
-            ) : (
-              sessions.map((s) => (
-                <Card
-                  key={s.id}
-                  className={cn(
-                    'cursor-pointer transition-colors hover:bg-muted/40',
-                    s.id === selectedId && 'ring-2 ring-sky-500/40 bg-sky-50/30',
-                  )}
-                  onClick={() => setSelectedId(s.id)}
-                >
-                  <CardContent className="p-3">
-                    <div className="flex items-center justify-between">
-                      <Badge variant="outline" className="text-[10px] font-mono">{s.trimestre}</Badge>
-                      <span className="text-[10px] text-muted-foreground">{fmtDate(s.date_seance)}</span>
-                    </div>
-                    {s.ordre_du_jour && (
-                      <p className="text-xs text-muted-foreground mt-1.5 line-clamp-2">{s.ordre_du_jour}</p>
+        <Tabs defaultValue="actions" className="flex-1 flex flex-col overflow-hidden">
+          <div className="px-6 pt-3 border-b">
+            <TabsList className="h-9">
+              <TabsTrigger value="actions" className="gap-1.5 text-xs">
+                <ListChecks className="h-3.5 w-3.5" /> Plan d'actions
+              </TabsTrigger>
+              <TabsTrigger value="seances" className="gap-1.5 text-xs">
+                <CalendarClock className="h-3.5 w-3.5" /> Séances
+              </TabsTrigger>
+            </TabsList>
+          </div>
+
+          {/* ── Tab: Plan d'actions (transversal) ── */}
+          <TabsContent value="actions" className="flex-1 overflow-y-auto p-6 mt-0">
+            <AllActionsTable isAdmin={isAdmin} sessions={sessions} />
+          </TabsContent>
+
+          {/* ── Tab: Séances ── */}
+          <TabsContent value="seances" className="flex-1 overflow-hidden flex mt-0">
+            {/* Left panel — sessions */}
+            <div className="w-80 border-r overflow-y-auto p-4 space-y-2 shrink-0">
+              {isAdmin && (
+                <Button onClick={() => setShowNewSession(true)} className="gap-2 w-full mb-3" size="sm" variant="outline">
+                  <Plus className="h-4 w-4" /> Nouvelle séance
+                </Button>
+              )}
+              {sessionsLoading ? (
+                Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-20" />)
+              ) : sessions.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">Aucune séance.</p>
+              ) : (
+                sessions.map((s) => (
+                  <Card
+                    key={s.id}
+                    className={cn(
+                      'cursor-pointer transition-colors hover:bg-muted/40',
+                      s.id === selectedId && 'ring-2 ring-sky-500/40 bg-sky-50/30',
                     )}
-                    <div className="flex items-center gap-1 mt-2 text-[10px] text-muted-foreground">
-                      <Users className="h-3 w-3" />
-                      {(s.participants as CGIParticipant[]).length} participant(s)
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
-            )}
-          </div>
+                    onClick={() => setSelectedId(s.id)}
+                  >
+                    <CardContent className="p-3">
+                      <div className="flex items-center justify-between">
+                        <Badge variant="outline" className="text-[10px] font-mono">{s.trimestre}</Badge>
+                        <span className="text-[10px] text-muted-foreground">{fmtDate(s.date_seance)}</span>
+                      </div>
+                      {s.ordre_du_jour && (
+                        <p className="text-xs text-muted-foreground mt-1.5 line-clamp-2">{s.ordre_du_jour}</p>
+                      )}
+                      <div className="flex items-center gap-1 mt-2 text-[10px] text-muted-foreground">
+                        <Users className="h-3 w-3" />
+                        {(s.participants as CGIParticipant[]).length} participant(s)
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
+              )}
+            </div>
 
-          {/* Right panel — session detail + actions */}
-          <div className="flex-1 overflow-y-auto p-6">
-            {selected ? (
-              <SessionDetail
-                session={selected}
-                isAdmin={isAdmin}
-                onEdit={() => setEditingSession(selected)}
-                onDelete={() => {
-                  if (confirm(`Supprimer la séance ${selected.trimestre} ?`)) {
-                    deleteSession.mutate(selected.id);
-                    setSelectedId(null);
-                  }
-                }}
-              />
-            ) : (
-              <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-                {isLoading ? 'Chargement…' : 'Sélectionnez une séance à gauche'}
-              </div>
-            )}
-          </div>
-        </div>
+            {/* Right panel — session detail + actions */}
+            <div className="flex-1 overflow-y-auto p-6">
+              {selected ? (
+                <SessionDetail
+                  session={selected}
+                  isAdmin={isAdmin}
+                  onEdit={() => setEditingSession(selected)}
+                  onDelete={() => {
+                    if (confirm(`Supprimer la séance ${selected.trimestre} ?`)) {
+                      deleteSession.mutate(selected.id);
+                      setSelectedId(null);
+                    }
+                  }}
+                />
+              ) : (
+                <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+                  {sessionsLoading ? 'Chargement…' : 'Sélectionnez une séance à gauche'}
+                </div>
+              )}
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
 
       {/* Dialog — new session */}
@@ -171,6 +185,192 @@ export default function ITComiteGI() {
         />
       )}
     </Layout>
+  );
+}
+
+// ─── All Actions Table (transversal) ────────────────────────────
+
+function AllActionsTable({ isAdmin, sessions }: { isAdmin: boolean; sessions: CGISession[] }) {
+  const { data: actions = [], isLoading } = useAllCGIActions();
+  const updateAction = useUpdateCGIAction();
+  const deleteAction = useDeleteCGIAction();
+  const createAction = useCreateCGIAction();
+  const [showNew, setShowNew] = useState(false);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+
+  const filtered = useMemo(() => {
+    let list = actions;
+    if (statusFilter !== 'all') {
+      list = list.filter((a) => a.status === statusFilter);
+    }
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter((a) => {
+        const md = (a as any).module_data as Record<string, any> | null;
+        return (
+          a.title?.toLowerCase().includes(q) ||
+          a.description?.toLowerCase().includes(q) ||
+          md?.responsable_fonction?.toLowerCase().includes(q)
+        );
+      });
+    }
+    return list;
+  }, [actions, statusFilter, search]);
+
+  const stats = useMemo(() => {
+    const s = { todo: 0, 'in-progress': 0, done: 0 };
+    actions.forEach((a) => { if (a.status in s) s[a.status as keyof typeof s]++; });
+    return s;
+  }, [actions]);
+
+  return (
+    <div className="space-y-4 max-w-6xl">
+      {/* Stats */}
+      <div className="flex gap-3">
+        {Object.entries(STATUS_MAP).map(([k, v]) => (
+          <Card key={k} className="flex-1">
+            <CardContent className="p-3 flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">{v.label}</span>
+              <Badge className={cn(v.color, 'border text-sm font-semibold')}>{stats[k as keyof typeof stats]}</Badge>
+            </CardContent>
+          </Card>
+        ))}
+        <Card className="flex-1">
+          <CardContent className="p-3 flex items-center justify-between">
+            <span className="text-xs text-muted-foreground">Total</span>
+            <Badge variant="outline" className="text-sm font-semibold">{actions.length}</Badge>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Filters + Add */}
+      <div className="flex items-center gap-3">
+        <div className="relative flex-1 max-w-xs">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <Input
+            placeholder="Rechercher…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="h-8 text-xs pl-8"
+          />
+        </div>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="h-8 text-xs w-[130px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Tous les statuts</SelectItem>
+            {Object.entries(STATUS_MAP).map(([k, v]) => (
+              <SelectItem key={k} value={k}>{v.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {isAdmin && (
+          <Button size="sm" variant="outline" className="h-8 gap-1 text-xs ml-auto" onClick={() => setShowNew(true)}>
+            <Plus className="h-3.5 w-3.5" /> Action
+          </Button>
+        )}
+      </div>
+
+      {/* Table */}
+      <Card>
+        <CardContent className="px-0 pb-0 pt-0">
+          {isLoading ? (
+            <div className="p-4"><Skeleton className="h-12" /></div>
+          ) : filtered.length === 0 ? (
+            <p className="text-xs text-muted-foreground text-center py-8">Aucune action trouvée.</p>
+          ) : (
+            <div className="overflow-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/40 text-xs text-muted-foreground">
+                    <th className="text-left px-3 py-2 font-medium">Action</th>
+                    <th className="text-left px-3 py-2 font-medium w-[160px]">Thème</th>
+                    <th className="text-left px-3 py-2 font-medium w-[140px]">Responsable</th>
+                    <th className="text-left px-3 py-2 font-medium w-[100px]">Échéance</th>
+                    <th className="text-left px-3 py-2 font-medium w-[110px]">Statut</th>
+                    {isAdmin && <th className="w-[60px]" />}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((a) => {
+                    const md = (a as any).module_data as Record<string, any> | null;
+                    const fonction = md?.responsable_fonction ?? '—';
+                    const sc = STATUS_MAP[a.status] ?? STATUS_MAP.todo;
+                    return (
+                      <tr key={a.id} className="border-b hover:bg-muted/20 transition-colors">
+                        <td className="px-3 py-2.5">
+                          <div className="font-medium">{a.title}</div>
+                          {a.description && (
+                            <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-1">{a.description}</p>
+                          )}
+                        </td>
+                        <td className="px-3 py-2.5">
+                          <Badge variant="secondary" className="text-[10px]">{fonction}</Badge>
+                        </td>
+                        <td className="px-3 py-2.5 text-xs">
+                          {a.assignee_id ? <ProfileName profileId={a.assignee_id} /> : <span className="text-muted-foreground">—</span>}
+                        </td>
+                        <td className="px-3 py-2.5 text-xs text-muted-foreground">{fmtDate(a.due_date)}</td>
+                        <td className="px-3 py-2.5">
+                          <Select
+                            value={a.status}
+                            onValueChange={(v) =>
+                              updateAction.mutate({ id: a.id, status: v as TaskStatus })
+                            }
+                          >
+                            <SelectTrigger className="h-7 text-[11px] w-[100px]">
+                              <Badge className={cn(sc.color, 'border text-[10px]')}>{sc.label}</Badge>
+                            </SelectTrigger>
+                            <SelectContent>
+                              {Object.entries(STATUS_MAP).map(([k, v]) => (
+                                <SelectItem key={k} value={k}>{v.label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </td>
+                        {isAdmin && (
+                          <td className="px-2 py-2.5 text-right">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                              onClick={() => {
+                                if (confirm('Supprimer cette action ?')) {
+                                  deleteAction.mutate({ id: a.id });
+                                }
+                              }}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Dialog — new action (needs a session) */}
+      {sessions.length > 0 && (
+        <ActionFormDialog
+          open={showNew}
+          onOpenChange={setShowNew}
+          sessionId={sessions[0].id}
+          sessions={sessions}
+          onSubmit={async (data) => {
+            await createAction.mutateAsync(data);
+            setShowNew(false);
+          }}
+          isSubmitting={createAction.isPending}
+        />
+      )}
+    </div>
   );
 }
 
@@ -251,15 +451,15 @@ function SessionDetail({
         </Card>
       )}
 
-      {/* Actions */}
-      <ActionsTable sessionId={session.id} isAdmin={isAdmin} />
+      {/* Actions de cette séance */}
+      <SessionActionsTable sessionId={session.id} isAdmin={isAdmin} />
     </div>
   );
 }
 
-// ─── Actions Table ───────────────────────────────────────────────
+// ─── Session Actions Table ──────────────────────────────────────
 
-function ActionsTable({ sessionId, isAdmin }: { sessionId: string; isAdmin: boolean }) {
+function SessionActionsTable({ sessionId, isAdmin }: { sessionId: string; isAdmin: boolean }) {
   const { data: actions = [], isLoading } = useCGIActions(sessionId);
   const createAction = useCreateCGIAction();
   const updateAction = useUpdateCGIAction();
@@ -270,7 +470,7 @@ function ActionsTable({ sessionId, isAdmin }: { sessionId: string; isAdmin: bool
     <Card>
       <CardHeader className="py-3 px-4 flex-row items-center justify-between">
         <CardTitle className="text-xs uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
-          <ChevronRight className="h-3.5 w-3.5" /> Plan d'actions
+          <ChevronRight className="h-3.5 w-3.5" /> Actions de cette séance
           <Badge variant="outline" className="ml-1 text-[10px]">{actions.length}</Badge>
         </CardTitle>
         {isAdmin && (
@@ -492,12 +692,14 @@ function ActionFormDialog({
   open,
   onOpenChange,
   sessionId,
+  sessions,
   onSubmit,
   isSubmitting,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   sessionId: string;
+  sessions?: CGISession[];
   onSubmit: (data: any) => Promise<void>;
   isSubmitting: boolean;
 }) {
@@ -505,6 +707,7 @@ function ActionFormDialog({
   const [fonction, setFonction] = useState<string>(CGI_FONCTIONS[0]);
   const [assigneeId, setAssigneeId] = useState<string | null>(null);
   const [dueDate, setDueDate] = useState('');
+  const [selectedSession, setSelectedSession] = useState(sessionId);
   const [profiles, setProfiles] = useState<{ id: string; display_name: string }[]>([]);
 
   useEffect(() => {
@@ -512,11 +715,14 @@ function ActionFormDialog({
       .then(({ data }) => setProfiles(data ?? []));
   }, []);
 
+  useEffect(() => { setSelectedSession(sessionId); }, [sessionId]);
+
   const reset = () => {
     setTitle('');
     setFonction(CGI_FONCTIONS[0]);
     setAssigneeId(null);
     setDueDate('');
+    setSelectedSession(sessionId);
   };
 
   return (
@@ -533,17 +739,24 @@ function ActionFormDialog({
             <Input value={title} onChange={(e) => setTitle(e.target.value)} className="h-8 text-xs" placeholder="Ex: Arbitrer le budget cloud 2027" />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          {sessions && sessions.length > 1 && (
             <div className="space-y-1">
-              <Label className="text-xs">Fonction responsable</Label>
-              <Select value={fonction} onValueChange={setFonction}>
-                <SelectTrigger className="h-8 text-xs"><span className="truncate">{fonction}</span></SelectTrigger>
+              <Label className="text-xs">Séance</Label>
+              <Select value={selectedSession} onValueChange={setSelectedSession}>
+                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {CGI_FONCTIONS.map((f) => (
-                    <SelectItem key={f} value={f}>{f}</SelectItem>
+                  {sessions.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>{s.trimestre} — {fmtDate(s.date_seance)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs">Thème</Label>
+              <Input value={fonction} onChange={(e) => setFonction(e.target.value)} className="h-8 text-xs" placeholder="Ex: SECURITE" />
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Échéance</Label>
@@ -574,7 +787,7 @@ function ActionFormDialog({
               size="sm"
               disabled={isSubmitting || !title.trim()}
               onClick={() => void onSubmit({
-                sessionId,
+                sessionId: selectedSession,
                 title: title.trim(),
                 responsable_fonction: fonction,
                 assignee_id: assigneeId,
@@ -600,5 +813,5 @@ function ProfileName({ profileId }: { profileId: string }) {
       .then(({ data }) => setName(data?.display_name ?? null));
   }, [profileId]);
   if (!name) return null;
-  return <span className="text-muted-foreground ml-0.5">({name})</span>;
+  return <span className="text-muted-foreground">{name}</span>;
 }

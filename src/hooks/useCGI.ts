@@ -9,6 +9,7 @@ import type { Task } from '@/types/task';
 const db = () => supabase as any;
 
 const SESSION_KEY = ['cgi-sessions'];
+const ALL_ACTIONS_KEY = ['cgi-all-actions'];
 const ACTIONS_KEY = (sessionId: string) => ['cgi-actions', sessionId];
 
 function useActiveProfile() {
@@ -102,6 +103,41 @@ export function useDeleteCGISession() {
   });
 }
 
+// ─── All Actions (transversal, no session filter) ───────────────
+
+export function useAllCGIActions() {
+  const qc = useQueryClient();
+  const instanceId = useId();
+
+  const query = useQuery<Task[]>({
+    queryKey: ALL_ACTIONS_KEY,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('module_code', 'cgi' as any)
+        .eq('type', 'task')
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as Task[];
+    },
+    staleTime: 15_000,
+  });
+
+  useEffect(() => {
+    const ch = supabase
+      .channel(`cgi-all-actions:${instanceId}`)
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'tasks', filter: 'module_code=eq.cgi' },
+        () => { qc.invalidateQueries({ queryKey: ALL_ACTIONS_KEY }); }
+      )
+      .subscribe();
+    return () => { void supabase.removeChannel(ch); };
+  }, [qc, instanceId]);
+
+  return query;
+}
+
 // ─── Actions (tasks with module_code='cgi') ─────────────────────
 
 export function useCGIActions(sessionId: string | null) {
@@ -180,6 +216,7 @@ export function useCreateCGIAction() {
         .single();
       if (error) throw error;
       qc.invalidateQueries({ queryKey: ACTIONS_KEY(input.sessionId) });
+      qc.invalidateQueries({ queryKey: ALL_ACTIONS_KEY });
       return data as Task;
     },
   });
@@ -188,13 +225,14 @@ export function useCreateCGIAction() {
 export function useUpdateCGIAction() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, sessionId, ...patch }: { id: string; sessionId: string } & Record<string, any>) => {
+    mutationFn: async ({ id, sessionId, ...patch }: { id: string; sessionId?: string } & Record<string, any>) => {
       const { error } = await supabase
         .from('tasks')
         .update(patch as any)
         .eq('id', id);
       if (error) throw error;
-      qc.invalidateQueries({ queryKey: ACTIONS_KEY(sessionId) });
+      if (sessionId) qc.invalidateQueries({ queryKey: ACTIONS_KEY(sessionId) });
+      qc.invalidateQueries({ queryKey: ALL_ACTIONS_KEY });
     },
   });
 }
@@ -202,10 +240,11 @@ export function useUpdateCGIAction() {
 export function useDeleteCGIAction() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, sessionId }: { id: string; sessionId: string }) => {
+    mutationFn: async ({ id, sessionId }: { id: string; sessionId?: string }) => {
       const { error } = await supabase.from('tasks').delete().eq('id', id);
       if (error) throw error;
-      qc.invalidateQueries({ queryKey: ACTIONS_KEY(sessionId) });
+      if (sessionId) qc.invalidateQueries({ queryKey: ACTIONS_KEY(sessionId) });
+      qc.invalidateQueries({ queryKey: ALL_ACTIONS_KEY });
     },
   });
 }
