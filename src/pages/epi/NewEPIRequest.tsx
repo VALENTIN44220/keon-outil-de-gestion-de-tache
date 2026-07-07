@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
@@ -11,7 +11,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { HardHat, Save, X, Plus, Minus, ShoppingBag } from 'lucide-react';
+import { HardHat, Save, X, Plus, Minus, ShoppingBag, CalendarIcon, FileText } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSimulation } from '@/contexts/SimulationContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -34,6 +34,12 @@ interface SelectedLine {
   refSycomore: string;
 }
 
+interface ProfileOption {
+  id: string;
+  display_name: string;
+  company: string | null;
+}
+
 const fmtEur = (v: number) =>
   new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
 
@@ -47,19 +53,40 @@ export default function NewEPIRequest() {
   const [typeDemande, setTypeDemande] = useState<EPITypeDemande>('ponctuelle');
   const [profilEpi, setProfilEpi] = useState<EPIProfil | ''>('');
   const [categorieFilter, setCategorieFilter] = useState<EPICategorie | '__all__'>('__all__');
-  const [nom, setNom] = useState(profile?.display_name?.split(' ').slice(1).join(' ') ?? '');
-  const [prenom, setPrenom] = useState(profile?.display_name?.split(' ')[0] ?? '');
-  const [filiale, setFiliale] = useState('');
+  const [beneficiaireId, setBeneficiaireId] = useState(profile?.id ?? '');
+  const [filiale, setFiliale] = useState((profile as any)?.company ?? '');
+  const [dateSouhaitee, setDateSouhaitee] = useState('');
   const [justification, setJustification] = useState('');
   const [lines, setLines] = useState<SelectedLine[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [allProfiles, setAllProfiles] = useState<ProfileOption[]>([]);
+
+  useEffect(() => {
+    supabase
+      .from('profiles')
+      .select('id, display_name, company')
+      .order('display_name')
+      .then(({ data }) => setAllProfiles((data as ProfileOption[]) ?? []));
+  }, []);
+
+  useEffect(() => {
+    if (!beneficiaireId || allProfiles.length === 0) return;
+    const p = allProfiles.find(x => x.id === beneficiaireId);
+    if (p?.company) setFiliale(p.company);
+  }, [beneficiaireId, allProfiles]);
+
+  // Pre-select beneficiaire to current user
+  useEffect(() => {
+    if (profile?.id && !beneficiaireId) setBeneficiaireId(profile.id);
+  }, [profile?.id]);
+
+  const selectedBeneficiaire = allProfiles.find(p => p.id === beneficiaireId);
 
   const { articles, isLoading: catalogueLoading } = useEPICatalogue(
     profilEpi || undefined,
     categorieFilter !== '__all__' ? categorieFilter : undefined,
   );
-
-  const filteredArticles = articles;
 
   const total = useMemo(
     () => lines.reduce((s, l) => s + l.quantite * (l.prixUnitaire + l.prixFlocage), 0),
@@ -104,8 +131,7 @@ export default function NewEPIRequest() {
 
   const canSubmit =
     !isSubmitting &&
-    nom.trim().length > 0 &&
-    prenom.trim().length > 0 &&
+    beneficiaireId.length > 0 &&
     profilEpi !== '' &&
     lines.length > 0 &&
     (typeDemande !== 'ponctuelle' || justification.trim().length > 0);
@@ -114,14 +140,18 @@ export default function NewEPIRequest() {
     if (!profile?.id || !user || !canSubmit) return;
     setIsSubmitting(true);
     try {
-      const title = `EPI ${typeDemande === 'dotation_annuelle' ? 'Dotation' : 'Ponctuelle'} — ${prenom.trim()} ${nom.trim()}`;
+      const benef = allProfiles.find(p => p.id === beneficiaireId);
+      const benefNom = benef?.display_name ?? '';
+      const title = `EPI ${typeDemande === 'dotation_annuelle' ? 'Dotation' : 'Ponctuelle'} — ${benefNom}`;
 
       const moduleData: Record<string, any> = {
         type_demande: typeDemande,
         profil_epi: profilEpi,
-        nom: nom.trim(),
-        prenom: prenom.trim(),
+        beneficiaire_id: beneficiaireId,
+        beneficiaire_nom: benefNom.split(' ').slice(1).join(' ') || benefNom,
+        beneficiaire_prenom: benefNom.split(' ')[0] || '',
         filiale: filiale || null,
+        date_souhaitee: dateSouhaitee || null,
         justification: justification || null,
       };
 
@@ -133,7 +163,9 @@ export default function NewEPIRequest() {
           title,
           description: justification || null,
           requester_id: profile.id,
+          assignee_id: beneficiaireId !== profile.id ? beneficiaireId : null,
           user_id: user.id,
+          due_date: dateSouhaitee || null,
           module_code: 'epi' as any,
           module_data: moduleData,
         })
@@ -181,12 +213,12 @@ export default function NewEPIRequest() {
               <div>
                 <h1 className="text-2xl font-display font-bold">Nouvelle demande EPI</h1>
                 <p className="text-sm text-muted-foreground">
-                  Sélectionnez votre profil EPI puis choisissez vos équipements
+                  Sélectionnez le bénéficiaire, le profil EPI puis choisissez les équipements
                 </p>
               </div>
             </div>
 
-            {/* Infos collaborateur */}
+            {/* Infos demande */}
             <Card>
               <CardContent className="pt-6 space-y-5">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -221,20 +253,65 @@ export default function NewEPIRequest() {
                     </Select>
                   </div>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <Label>Prénom *</Label>
-                    <Input value={prenom} onChange={(e) => setPrenom(e.target.value)} disabled={isSubmitting} />
+                    <Label>Demandeur</Label>
+                    <Input
+                      value={profile?.display_name ?? ''}
+                      disabled
+                      className="bg-muted"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">Vous (connecté)</p>
                   </div>
                   <div>
-                    <Label>Nom *</Label>
-                    <Input value={nom} onChange={(e) => setNom(e.target.value)} disabled={isSubmitting} />
-                  </div>
-                  <div>
-                    <Label>Filiale</Label>
-                    <Input value={filiale} onChange={(e) => setFiliale(e.target.value)} disabled={isSubmitting} />
+                    <Label>Bénéficiaire des EPI *</Label>
+                    <Select
+                      value={beneficiaireId}
+                      onValueChange={setBeneficiaireId}
+                      disabled={isSubmitting}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Sélectionner un collaborateur…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {allProfiles.map(p => (
+                          <SelectItem key={p.id} value={p.id}>
+                            {p.display_name}{p.company ? ` (${p.company})` : ''}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Par défaut : vous-même. Changez pour une demande au nom d'un autre collaborateur.
+                    </p>
                   </div>
                 </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <Label>Filiale</Label>
+                    <Input
+                      value={filiale}
+                      disabled
+                      className="bg-muted"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">Remplie automatiquement depuis le profil du bénéficiaire</p>
+                  </div>
+                  <div>
+                    <Label className="flex items-center gap-1">
+                      <CalendarIcon className="h-3 w-3" />
+                      Date souhaitée de réception
+                    </Label>
+                    <Input
+                      type="date"
+                      value={dateSouhaitee}
+                      onChange={(e) => setDateSouhaitee(e.target.value)}
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                </div>
+
                 {typeDemande === 'ponctuelle' && (
                   <div>
                     <Label>Justification *</Label>
@@ -243,7 +320,7 @@ export default function NewEPIRequest() {
                       value={justification}
                       onChange={(e) => setJustification(e.target.value)}
                       disabled={isSubmitting}
-                      placeholder="Raison de la demande ponctuelle…"
+                      placeholder="Raison de la demande ponctuelle (nouvel arrivant, remplacement…)"
                     />
                   </div>
                 )}
@@ -276,11 +353,11 @@ export default function NewEPIRequest() {
 
                   {catalogueLoading ? (
                     <div className="text-center py-8 text-muted-foreground">Chargement du catalogue…</div>
-                  ) : filteredArticles.length === 0 ? (
+                  ) : articles.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground">Aucun article pour ce profil.</div>
                   ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {filteredArticles.map((art) => (
+                      {articles.map((art) => (
                         <ArticleCard
                           key={art.id}
                           article={art}
@@ -339,7 +416,7 @@ export default function NewEPIRequest() {
 
             {/* Actions */}
             <div className="flex items-center justify-end gap-2 pb-8">
-              <Button variant="outline" onClick={() => navigate('/epi/dispatch')} disabled={isSubmitting}>
+              <Button variant="outline" onClick={() => navigate(-1)} disabled={isSubmitting}>
                 <X className="h-4 w-4 mr-2" /> Annuler
               </Button>
               <Button onClick={handleSubmit} disabled={!canSubmit}>
@@ -390,9 +467,22 @@ function ArticleCard({
           </Badge>
         )}
       </div>
-      <Badge variant="outline" className="text-xs">
-        {EPI_CATEGORIE_LABELS[art.categorie] ?? art.categorie}
-      </Badge>
+      <div className="flex items-center gap-2">
+        <Badge variant="outline" className="text-xs">
+          {EPI_CATEGORIE_LABELS[art.categorie] ?? art.categorie}
+        </Badge>
+        {art.fiche_technique_url && (
+          <a
+            href={art.fiche_technique_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-blue-600 hover:underline flex items-center gap-0.5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <FileText className="h-3 w-3" /> Fiche
+          </a>
+        )}
+      </div>
       <p className="text-xs text-muted-foreground">{prixRange}</p>
       <div className="flex gap-2">
         {art.tailles.length > 1 ? (

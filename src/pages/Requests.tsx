@@ -27,7 +27,7 @@ import { usePendingAssignments } from '@/hooks/usePendingAssignments';
 import { useTasks } from '@/hooks/useTasks';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { FolderOpen, Building2, Lightbulb, ListChecks, ClipboardList, UserCog, ArrowRight, Monitor, Truck, Package, ShieldAlert, UserPlus, Users, AlertTriangle } from 'lucide-react';
+import { FolderOpen, Building2, Lightbulb, ListChecks, ClipboardList, UserCog, ArrowRight, Monitor, Truck, Package, ShieldAlert, UserPlus, Users, AlertTriangle, HardHat } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   SUPPLIER_NEW_REQUEST_PROCESS_TEMPLATE_ID,
@@ -185,6 +185,15 @@ const Requests = () => {
       icon: UserPlus,
       accent: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300',
       onClick: () => navigate('/client/new'),
+      visible: true,
+    },
+    {
+      key: 'epi',
+      label: 'Demande EPI',
+      description: 'Équipements de protection individuelle : dotation ou remplacement',
+      icon: HardHat,
+      accent: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+      onClick: () => navigate('/epi/new'),
       visible: true,
     },
     {

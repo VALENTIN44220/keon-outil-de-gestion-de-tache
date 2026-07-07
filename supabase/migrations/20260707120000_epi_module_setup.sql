@@ -173,7 +173,13 @@ SELECT
   (t.module_data->>'campagne_annee')::text AS campagne_annee,
   (t.module_data->>'beneficiaire_nom')::text AS beneficiaire_nom,
   (t.module_data->>'beneficiaire_prenom')::text AS beneficiaire_prenom,
+  (t.module_data->>'beneficiaire_id')::text AS beneficiaire_id,
   (t.module_data->>'filiale')::text AS filiale,
+  (t.module_data->>'date_souhaitee')::text AS date_souhaitee,
+  (t.module_data->>'justification')::text AS justification,
+  (t.module_data->>'ref_commande_divalto')::text AS ref_commande_divalto,
+  (t.module_data->>'ref_bl_divalto')::text AS ref_bl_divalto,
+  (t.module_data->>'ref_facture_divalto')::text AS ref_facture_divalto,
   COALESCE(agg.lignes, '[]'::json) AS lignes,
   COALESCE(agg.nb_lignes, 0) AS nb_lignes,
   COALESCE(agg.montant_total, 0) AS montant_total

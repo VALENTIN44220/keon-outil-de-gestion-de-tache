@@ -1,9 +1,12 @@
+import { useState } from 'react';
 import {
   HardHat, AlertTriangle, Clock, ListChecks, Trash2,
-  User, Calendar, Boxes, Euro,
+  User, Calendar, Boxes, Euro, FileSpreadsheet, FileText, Truck,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
@@ -68,6 +71,74 @@ const deleteRequest = async (id: string, refetch: () => void) => {
   }
 };
 
+// ── Exports synthèses ───────────────────────────────────────────────────────
+
+function exportSyntheseFournisseur(requests: EPIRequest[]) {
+  const actives = requests.filter(r => !EPI_TERMINAL.includes(r.status));
+  const map = new Map<string, { ref: string; designation: string; taille: string; qte: number; prix: number }>();
+  for (const r of actives) {
+    for (const l of r.lignes ?? []) {
+      const key = `${l.ref_sycomore}|${l.taille}`;
+      const existing = map.get(key);
+      if (existing) {
+        existing.qte += l.quantite;
+      } else {
+        map.set(key, { ref: l.ref_sycomore, designation: l.designation, taille: l.taille, qte: l.quantite, prix: l.prix_unitaire });
+      }
+    }
+  }
+  const rows = Array.from(map.values()).sort((a, b) => a.ref.localeCompare(b.ref));
+  const header = 'Référence\tDésignation\tTaille\tQuantité\tPrix unit.\tTotal HT';
+  const csv = [header, ...rows.map(r =>
+    `${r.ref}\t${r.designation}\t${r.taille}\t${r.qte}\t${r.prix.toFixed(2)}\t${(r.qte * r.prix).toFixed(2)}`,
+  )].join('\n');
+  downloadTsv(csv, `synthese_fournisseur_epi_${new Date().toISOString().slice(0, 10)}.xls`);
+}
+
+function exportSyntheseFiliale(requests: EPIRequest[]) {
+  const actives = requests.filter(r => !EPI_TERMINAL.includes(r.status));
+  const byFiliale = new Map<string, { ref: string; designation: string; taille: string; qte: number; prix: number }[]>();
+  for (const r of actives) {
+    const fil = r.filiale ?? 'Non renseignée';
+    if (!byFiliale.has(fil)) byFiliale.set(fil, []);
+    for (const l of r.lignes ?? []) {
+      byFiliale.get(fil)!.push({ ref: l.ref_sycomore, designation: l.designation, taille: l.taille, qte: l.quantite, prix: l.prix_unitaire + l.prix_flocage });
+    }
+  }
+  const lines: string[] = ['Filiale\tRéférence\tDésignation\tTaille\tQuantité\tMontant HT'];
+  for (const [fil, items] of Array.from(byFiliale.entries()).sort((a, b) => a[0].localeCompare(b[0]))) {
+    for (const it of items) {
+      lines.push(`${fil}\t${it.ref}\t${it.designation}\t${it.taille}\t${it.qte}\t${(it.qte * it.prix).toFixed(2)}`);
+    }
+  }
+  downloadTsv(lines.join('\n'), `synthese_filiale_epi_${new Date().toISOString().slice(0, 10)}.xls`);
+}
+
+function exportSyntheseIndividuelle(requests: EPIRequest[]) {
+  const actives = requests.filter(r => !EPI_TERMINAL.includes(r.status));
+  const lines: string[] = ['Collaborateur\tFiliale\tProfil\tRéférence\tDésignation\tTaille\tQuantité\tPrix unit.\tMontant HT'];
+  for (const r of actives) {
+    const collab = `${r.beneficiaire_prenom ?? ''} ${r.beneficiaire_nom ?? ''}`.trim();
+    for (const l of r.lignes ?? []) {
+      lines.push(`${collab}\t${r.filiale ?? ''}\t${r.profil_epi ? EPI_PROFIL_LABELS[r.profil_epi] : ''}\t${l.ref_sycomore}\t${l.designation}\t${l.taille}\t${l.quantite}\t${(l.prix_unitaire + l.prix_flocage).toFixed(2)}\t${(l.quantite * (l.prix_unitaire + l.prix_flocage)).toFixed(2)}`);
+    }
+  }
+  downloadTsv(lines.join('\n'), `synthese_individuelle_epi_${new Date().toISOString().slice(0, 10)}.xls`);
+}
+
+function downloadTsv(content: string, filename: string) {
+  const BOM = '﻿';
+  const blob = new Blob([BOM + content], { type: 'application/vnd.ms-excel;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ── Config dispatch ─────────────────────────────────────────────────────────
+
 export const epiDispatchConfig: ModuleDispatchConfig<EPIRequest, {}> = {
   moduleCode: 'epi',
   activeView: 'epi-dispatch',
@@ -90,6 +161,8 @@ export const epiDispatchConfig: ModuleDispatchConfig<EPIRequest, {}> = {
   terminalStatuses: EPI_TERMINAL,
   enableKanban: false,
   enableCalendar: false,
+
+  HeaderExtras: () => <EPIHeaderActions />,
 
   computeKpis: (requests): ModuleKpi[] => {
     const total = requests.length;
@@ -121,6 +194,7 @@ export const epiDispatchConfig: ModuleDispatchConfig<EPIRequest, {}> = {
     r.beneficiaire_nom ?? '',
     r.beneficiaire_prenom ?? '',
     r.filiale ?? '',
+    r.ref_commande_divalto ?? '',
     ...(r.lignes?.map(l => l.designation) ?? []),
   ],
 
@@ -136,15 +210,15 @@ export const epiDispatchConfig: ModuleDispatchConfig<EPIRequest, {}> = {
     },
     {
       key: 'beneficiaire',
-      header: 'Collaborateur',
+      header: 'Bénéficiaire',
       className: 'font-medium max-w-[200px] truncate',
       cell: (r) => <>{r.beneficiaire_prenom} {r.beneficiaire_nom}</>,
     },
     {
-      key: 'profil',
-      header: 'Profil',
+      key: 'filiale',
+      header: 'Filiale',
       className: 'text-xs',
-      cell: (r) => <>{r.profil_epi ? EPI_PROFIL_LABELS[r.profil_epi] ?? r.profil_epi : '—'}</>,
+      cell: (r) => <>{r.filiale ?? '—'}</>,
     },
     {
       key: 'articles',
@@ -178,6 +252,7 @@ export const epiDispatchConfig: ModuleDispatchConfig<EPIRequest, {}> = {
     <div className="space-y-2">
       <p className="text-xs font-medium text-muted-foreground">
         Articles ({r.nb_lignes}) — {r.filiale ?? '—'}
+        {r.date_souhaitee && <> — Souhaitée le {format(parseISO(r.date_souhaitee), 'dd/MM/yyyy', { locale: fr })}</>}
       </p>
       <Table>
         <TableHeader>
@@ -213,6 +288,32 @@ export const epiDispatchConfig: ModuleDispatchConfig<EPIRequest, {}> = {
   rowActions: (r, ctx) => <EPIRowActions request={r} ctx={ctx} />,
   DetailDialog: (props) => <EPIDetailDialog {...props} />,
 };
+
+// ── Header actions (exports) ────────────────────────────────────────────────
+
+function EPIHeaderActions() {
+  const { effectivePermissions } = usePermissionsContext();
+  const canManage = effectivePermissions.can_manage_epi;
+  const { requests } = useEPIRequests();
+
+  if (!canManage) return null;
+
+  return (
+    <div className="flex gap-2 flex-wrap">
+      <Button size="sm" variant="outline" onClick={() => exportSyntheseFournisseur(requests)}>
+        <FileSpreadsheet className="h-3 w-3 mr-1" /> Synthèse fournisseur
+      </Button>
+      <Button size="sm" variant="outline" onClick={() => exportSyntheseFiliale(requests)}>
+        <FileText className="h-3 w-3 mr-1" /> Synthèse par filiale
+      </Button>
+      <Button size="sm" variant="outline" onClick={() => exportSyntheseIndividuelle(requests)}>
+        <User className="h-3 w-3 mr-1" /> Synthèse individuelle
+      </Button>
+    </div>
+  );
+}
+
+// ── Row actions ─────────────────────────────────────────────────────────────
 
 function EPIRowActions({ request: r, ctx }: { request: EPIRequest; ctx: ModuleRowCtx }) {
   const { effectivePermissions } = usePermissionsContext();
@@ -267,6 +368,8 @@ function EPIRowActions({ request: r, ctx }: { request: EPIRequest; ctx: ModuleRo
   );
 }
 
+// ── Detail dialog ───────────────────────────────────────────────────────────
+
 function EPIDetailDialog({ request, open, onClose, refetch, isAdmin, profilesMap }: {
   request: EPIRequest;
   open: boolean;
@@ -279,12 +382,27 @@ function EPIDetailDialog({ request, open, onClose, refetch, isAdmin, profilesMap
   const { effectivePermissions } = usePermissionsContext();
   const canManage = effectivePermissions.can_manage_epi || isAdmin;
 
+  const [refCommande, setRefCommande] = useState(request.ref_commande_divalto ?? '');
+  const [refBl, setRefBl] = useState(request.ref_bl_divalto ?? '');
+  const [refFacture, setRefFacture] = useState(request.ref_facture_divalto ?? '');
+
   const fmtDay = (iso: string | null | undefined) =>
     iso ? format(parseISO(iso), 'dd/MM/yyyy', { locale: fr }) : '—';
 
+  const saveDivaltoRefs = async () => {
+    try {
+      const md = { ...(request.module_data ?? {}), ref_commande_divalto: refCommande || null, ref_bl_divalto: refBl || null, ref_facture_divalto: refFacture || null };
+      await supabase.from('tasks').update({ module_data: md }).eq('id', request.task_id);
+      toast.success('Références Divalto mises à jour');
+      refetch();
+    } catch (e: any) {
+      toast.error(`Erreur : ${e.message}`);
+    }
+  };
+
   const infoLines: DetailInfoLine[] = [
     {
-      label: 'Collaborateur',
+      label: 'Bénéficiaire',
       icon: <User className="h-3 w-3" />,
       value: `${request.beneficiaire_prenom ?? ''} ${request.beneficiaire_nom ?? ''}`.trim() || '—',
     },
@@ -307,6 +425,11 @@ function EPIDetailDialog({ request, open, onClose, refetch, isAdmin, profilesMap
       label: 'Filiale',
       icon: <Boxes className="h-3 w-3" />,
       value: request.filiale ?? '—',
+    },
+    {
+      label: 'Date souhaitée',
+      icon: <Calendar className="h-3 w-3" />,
+      value: fmtDay(request.date_souhaitee),
     },
     {
       label: 'Demandée le',
@@ -359,6 +482,42 @@ function EPIDetailDialog({ request, open, onClose, refetch, isAdmin, profilesMap
     },
   ];
 
+  if (request.justification) {
+    sections.push({
+      title: 'Justification',
+      icon: <FileText className="h-3 w-3" />,
+      content: <p className="text-sm whitespace-pre-wrap">{request.justification}</p>,
+    });
+  }
+
+  if (canManage) {
+    sections.push({
+      title: 'Références Divalto (Commande / BL / Facture)',
+      icon: <Truck className="h-3 w-3" />,
+      content: (
+        <div className="space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <Label className="text-xs">Réf. commande</Label>
+              <Input value={refCommande} onChange={e => setRefCommande(e.target.value)} placeholder="N° commande Divalto" className="h-8 text-xs" />
+            </div>
+            <div>
+              <Label className="text-xs">Réf. BL</Label>
+              <Input value={refBl} onChange={e => setRefBl(e.target.value)} placeholder="N° bon de livraison" className="h-8 text-xs" />
+            </div>
+            <div>
+              <Label className="text-xs">Réf. facture</Label>
+              <Input value={refFacture} onChange={e => setRefFacture(e.target.value)} placeholder="N° facture" className="h-8 text-xs" />
+            </div>
+          </div>
+          <Button size="sm" variant="outline" onClick={saveDivaltoRefs}>
+            Enregistrer les références
+          </Button>
+        </div>
+      ),
+    });
+  }
+
   const statusActions: DetailStatusAction[] = [];
   if (request.status === 'todo' && canManage) {
     statusActions.push({
@@ -395,10 +554,25 @@ function EPIDetailDialog({ request, open, onClose, refetch, isAdmin, profilesMap
     });
     statusActions.push({
       key: 'attr',
-      label: 'Marquer attribuée',
+      label: 'Attribuer et clôturer',
       onClick: async () => {
         await supabase.from('epi_demande_lignes' as any).update({ statut: 'attribuee' }).eq('request_id', request.task_id);
         await supabase.from('tasks').update({ status: 'done' }).eq('id', request.task_id);
+
+        // Historiser dans epi_attributions
+        if (request.beneficiaire_id) {
+          const attributions = (request.lignes ?? []).map(l => ({
+            beneficiaire_id: request.beneficiaire_id!,
+            article_id: l.article_id,
+            taille_id: l.id,
+            quantite: l.quantite,
+            campagne_annee: request.type_demande === 'dotation_annuelle' ? new Date().getFullYear() : null,
+          }));
+          if (attributions.length > 0) {
+            await supabase.from('epi_attributions' as any).insert(attributions);
+          }
+        }
+
         toast.success('EPI attribués — demande clôturée');
         refetch();
       },

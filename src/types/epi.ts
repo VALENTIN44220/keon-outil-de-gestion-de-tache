@@ -145,7 +145,13 @@ export interface EPIRequest {
   campagne_annee: string | null;
   beneficiaire_nom: string | null;
   beneficiaire_prenom: string | null;
+  beneficiaire_id: string | null;
   filiale: string | null;
+  date_souhaitee: string | null;
+  justification: string | null;
+  ref_commande_divalto: string | null;
+  ref_bl_divalto: string | null;
+  ref_facture_divalto: string | null;
   lignes: EPIRequestLigne[];
   nb_lignes: number;
   montant_total: number;
