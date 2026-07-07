@@ -5,6 +5,7 @@ import {
   Lightbulb, Monitor, Leaf, Euro, Map as MapIcon, Users, Wallet,
   Package, Truck, ShieldAlert, Settings2, BarChart2,
   UserPlus, AlertTriangle, ListChecks, BookOpen, TrendingUp, Bug,
+  HardHat, ShoppingBag,
 } from 'lucide-react';
 import type { ScreenPermissionKey, FeaturePermissionKey } from '@/types/permissions';
 
@@ -101,6 +102,13 @@ export const menuGroups: MenuGroup[] = [
     ],
   },
   {
+    label: 'EPI',
+    items: [
+      { id: 'epi-dispatch', label: 'Demandes EPI', icon: HardHat, path: '/epi/dispatch', permissionKey: 'can_access_epi' },
+      { id: 'epi-catalogue', label: 'Catalogue EPI', icon: ShoppingBag, path: '/epi/catalogue', permissionKey: 'can_access_epi' },
+    ],
+  },
+  {
     label: 'ACHATS',
     items: [
       { id: 'suppliers', label: 'Fournisseurs', icon: Building2, path: '/suppliers', permissionKey: 'can_access_suppliers' },
@@ -157,6 +165,7 @@ export const SECTION_COLORS: Record<string, string> = {
   'RH':              '#ec4899', // pink-500
   'CLIENTS':         '#06b6d4', // cyan-500
   'LOGISTIQUE':      '#06b6d4', // cyan-500
+  'EPI':             '#d97706', // amber-600
   'ACHATS':          '#f97316', // orange-500
   'CONFIGURATION':   '#64748b', // slate-500
   'OUTILS':          '#a855f7', // purple-500
