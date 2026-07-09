@@ -10,9 +10,7 @@ import { SupplierSynthesisModal } from '@/components/suppliers/SupplierSynthesis
 import { NewSupplierRequestDialog } from '@/components/suppliers/NewSupplierRequestDialog';
 import { SupplierWaitingApprovalListDialog } from '@/components/suppliers/SupplierWaitingApprovalListDialog';
 import { MySupplierRequestsDialog } from '@/components/suppliers/MySupplierRequestsDialog';
-import { Clock, Loader2, Sparkles, ListChecks, RefreshCw } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from '@/hooks/use-toast';
+import { Clock, Loader2, Sparkles, ListChecks } from 'lucide-react';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
@@ -35,34 +33,6 @@ export default function SupplierReference() {
   const [myRequestsOpen, setMyRequestsOpen] = useState(false);
   const [myRequestsAutoId, setMyRequestsAutoId] = useState<string | null>(null);
   const [activeView, setActiveView] = useState('suppliers');
-  const [isSyncingDivalto, setIsSyncingDivalto] = useState(false);
-
-  // Synchronisation manuelle des fournisseurs Divalto vers la table
-  // d'enrichissement. Le cron tourne déjà à 7h30 UTC tous les jours, mais
-  // cet bouton permet aux admins Achats de forcer une synchro à la demande.
-  const handleSyncDivalto = async () => {
-    setIsSyncingDivalto(true);
-    try {
-      const { data, error } = await supabase
-        .rpc('sync_divalto_suppliers_to_enrichment') as { data: { inserted_count: number; total_distinct_divalto: number }[] | null; error: any };
-      if (error) throw error;
-      const row = Array.isArray(data) ? data[0] : null;
-      const inserted = row?.inserted_count ?? 0;
-      const total = row?.total_distinct_divalto ?? 0;
-      toast({
-        title: inserted > 0 ? `${inserted} nouveau${inserted > 1 ? 'x' : ''} fournisseur${inserted > 1 ? 's' : ''} importé${inserted > 1 ? 's' : ''}` : 'Aucun nouveau fournisseur',
-        description: `${total} tiers distincts dans Divalto au total.${inserted > 0 ? ' Rafraîchis la page pour les voir.' : ''}`,
-      });
-    } catch (e: any) {
-      toast({
-        title: 'Erreur de synchronisation',
-        description: e?.message || 'Échec de la fonction sync_divalto_suppliers_to_enrichment',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsSyncingDivalto(false);
-    }
-  };
 
   // Ouvre la bonne dialog selon les query params (depuis une notification cliquée)
   useEffect(() => {
@@ -167,26 +137,6 @@ export default function SupplierReference() {
               </Button>
             )}
 
-            {/* Synchroniser depuis Divalto — admins uniquement.
-                Un cron tourne déjà à 7h30 UTC chaque jour, ce bouton sert
-                de filet pour les cas urgents (nouveau fournisseur urgent). */}
-            {isAdmin && (
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full sm:w-auto h-10 font-medium border-amber-200 text-amber-700 hover:bg-amber-50"
-                onClick={handleSyncDivalto}
-                disabled={isSyncingDivalto}
-                title="Importer les nouveaux fournisseurs Divalto manquants"
-              >
-                {isSyncingDivalto ? (
-                  <Loader2 className="h-4 w-4 mr-2 shrink-0 animate-spin" />
-                ) : (
-                  <RefreshCw className="h-4 w-4 mr-2 shrink-0" />
-                )}
-                Synchroniser depuis Divalto
-              </Button>
-            )}
           </div>
         </PageHeader>
         <main className="min-h-0 flex-1 overflow-y-auto p-6">
