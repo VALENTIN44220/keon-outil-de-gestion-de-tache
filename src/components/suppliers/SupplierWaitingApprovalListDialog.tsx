@@ -92,47 +92,48 @@ export function SupplierWaitingApprovalListDialog({ open, onClose }: SupplierWai
     return list;
   }, [selectedIds, rows]);
 
-  const allSelectedReadyForPromote =
-    selectedCount > 0 &&
-    selectedRowsResolved.length === selectedCount &&
-    selectedRowsResolved.every(
-      (r) =>
-        Boolean(r.validated_by_compta_at) &&
-        Boolean(r.validated_by_achats_at) &&
-        Boolean(r.tiers?.trim()) &&
-        !r.rejected_at,
-    );
-
   const { isAdmin } = useUserRole();
   const { data: validationRole = 'none' } = useSupplierValidationRole();
   const canReject = validationRole !== 'none';
 
+  // Peut agir côté comptabilité : compta, les deux rôles, ou admin.
+  const canActCompta = validationRole === 'compta' || validationRole === 'both' || isAdmin;
+  const canBoth = validationRole === 'both';
+
+  // Toutes les lignes sélectionnées portent-elles la validation Achats (préalable) ?
+  const allSelectedHaveAchats =
+    selectedCount > 0 &&
+    selectedRowsResolved.length === selectedCount &&
+    selectedRowsResolved.every((r) => Boolean(r.validated_by_achats_at) && !r.rejected_at);
+
+  // Numéro fournisseur (TIERS) renseigné pour toutes les lignes sélectionnées.
+  const allSelectedTiersValid =
+    selectedCount > 0 && selectedRowsResolved.every((r) => Boolean(r.tiers?.trim()));
+
+  // Étape finale comptabilité : Achats validés + rôle compta → un seul bouton
+  // « Valider et intégrer », activable uniquement quand le N° TIERS est valide.
+  const showFinalizeStep = canActCompta && allSelectedHaveAchats;
+
+  // Compta seul : bloqué tant que les Achats n'ont pas validé au moins une ligne.
   const comptaBlockedUntilAchat =
-    !allSelectedReadyForPromote &&
     validationRole === 'compta' &&
     selectedCount > 0 &&
     selectedRowsResolved.some((r) => !r.validated_by_achats_at);
 
-  const canBoth = validationRole === 'both';
-
   const nextStepIsAchat =
-    canBoth &&
+    (validationRole === 'achat' || canBoth) &&
     selectedCount > 0 &&
     selectedRowsResolved.some((r) => !r.validated_by_achats_at);
 
-  const validationButtonLabel = allSelectedReadyForPromote
+  const validationButtonLabel = showFinalizeStep
     ? selectedCount > 1
-      ? 'Ajouter les fournisseurs à la base de données'
-      : 'Ajouter le fournisseur à la base de données'
-    : canBoth
-      ? nextStepIsAchat
-        ? 'Valider — étape Achats'
-        : 'Valider — étape Comptabilité'
+      ? 'Valider et intégrer les fournisseurs'
+      : 'Valider et intégrer le fournisseur'
+    : nextStepIsAchat
+      ? 'Valider — étape Achats'
       : validationRole === 'achat'
         ? 'Valider (Achats)'
-        : validationRole === 'compta'
-          ? 'Valider (Comptabilité)'
-          : 'Valider le(s) fournisseur(s)';
+        : 'Valider le(s) fournisseur(s)';
 
   const handleSaveTiers = async (waitingId: string, raw: string) => {
     const v = raw.trim();
@@ -197,10 +198,18 @@ export function SupplierWaitingApprovalListDialog({ open, onClose }: SupplierWai
     }
   };
 
-  const handlePromoteSelection = async () => {
-    if (selectedCount === 0 || !allSelectedReadyForPromote) return;
+  // Étape finale comptabilité en un seul clic : pose le tampon Comptabilité
+  // (idempotent si déjà validé) puis intègre la/les fiche(s) au référentiel.
+  const handleValidateAndIntegrate = async () => {
+    if (selectedCount === 0 || !showFinalizeStep || !allSelectedTiersValid) return;
     setPromoting(true);
     try {
+      // 1. Validation comptabilité (no-op si le tampon existe déjà)
+      const { error: vErr } = await supabase.rpc('apply_supplier_waiting_validation', {
+        p_waiting_ids: Array.from(selectedIds),
+      });
+      if (vErr) throw vErr;
+      // 2. Intégration au référentiel
       const { data, error } = await supabase.rpc('promote_supplier_waiting_to_enrichment', {
         p_waiting_ids: Array.from(selectedIds),
       });
@@ -214,8 +223,8 @@ export function SupplierWaitingApprovalListDialog({ open, onClose }: SupplierWai
         title: 'Fournisseur(s) ajouté(s) au référentiel',
         description:
           promoted.length > 1
-            ? `${promoted.length} fiches ont été créées dans le référentiel fournisseurs.`
-            : 'La fiche a été créée dans le référentiel fournisseurs.',
+            ? `${promoted.length} fiches ont été validées et créées dans le référentiel fournisseurs.`
+            : 'La fiche a été validée et créée dans le référentiel fournisseurs.',
       });
       setSelectedIds(new Set());
       await queryClient.invalidateQueries({ queryKey: ['supplier-waiting-approval'] });
@@ -398,11 +407,12 @@ export function SupplierWaitingApprovalListDialog({ open, onClose }: SupplierWai
                       )}
                     </div>
 
-                    {/* Champ TIERS (après validation compta, non refusé) */}
-                    {r.validated_by_compta_at && !r.rejected_at ? (
+                    {/* Champ TIERS (numéro fournisseur) — saisissable dès la
+                        validation Achats par la comptabilité, avant intégration. */}
+                    {r.validated_by_achats_at && !r.rejected_at && canActCompta ? (
                       <div className="flex flex-col gap-1 shrink-0 sm:min-w-[140px]">
                         <Label htmlFor={`tiers-${r.id}`} className="text-xs text-muted-foreground">
-                          TIERS
+                          N° fournisseur (TIERS)
                         </Label>
                         <Input
                           id={`tiers-${r.id}`}
@@ -489,6 +499,10 @@ export function SupplierWaitingApprovalListDialog({ open, onClose }: SupplierWai
                 Aucune validation des achats n&apos;a encore été enregistrée pour au moins une ligne sélectionnée. Les achats
                 doivent valider avant la comptabilité.
               </p>
+            ) : showFinalizeStep && !allSelectedTiersValid ? (
+              <p className="text-xs text-amber-800 dark:text-amber-200/90 text-right order-1 max-w-full sm:max-w-md">
+                Renseignez un N° fournisseur (TIERS) pour chaque ligne sélectionnée afin de pouvoir valider et intégrer.
+              </p>
             ) : null}
             <div className="flex flex-row justify-end order-2 w-full">
               <Button
@@ -498,11 +512,12 @@ export function SupplierWaitingApprovalListDialog({ open, onClose }: SupplierWai
                   validating ||
                   promoting ||
                   (tierSavingId !== null && selectedIds.has(tierSavingId)) ||
-                  comptaBlockedUntilAchat
+                  comptaBlockedUntilAchat ||
+                  (showFinalizeStep && !allSelectedTiersValid)
                 }
                 className="bg-violet-600 hover:bg-violet-700 text-white shrink-0 max-w-full whitespace-normal h-auto min-h-10 py-2 text-center"
                 onClick={() =>
-                  void (allSelectedReadyForPromote ? handlePromoteSelection() : handleValidateSelection())
+                  void (showFinalizeStep ? handleValidateAndIntegrate() : handleValidateSelection())
                 }
               >
                 <span className="inline-flex items-center justify-center gap-2 text-center">

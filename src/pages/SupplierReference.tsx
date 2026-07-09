@@ -207,6 +207,7 @@ export default function SupplierReference() {
         onClose={handleCloseDrawer}
         canEdit={supplierPermissions.canEdit}
         isAdmin={isAdmin}
+        canDelete={supplierPermissions.canDelete}
       />
 
       <SupplierSynthesisModal

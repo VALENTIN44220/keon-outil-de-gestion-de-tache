@@ -57,8 +57,10 @@ interface SupplierDetailDrawerProps {
   open: boolean;
   onClose: () => void;
   canEdit?: boolean;
-  /** Rôle app `admin` uniquement — sert à afficher la suppression (jamais à partir de can_delete_suppliers). */
+  /** Rôle app `admin` — accès complet (dont suppression). */
   isAdmin?: boolean;
+  /** Permission granulaire `can_delete_suppliers` — autorise la suppression pour les non-admins. */
+  canDelete?: boolean;
 }
 
 type SupplierRow = {
@@ -124,8 +126,10 @@ const TYPES_CONTRAT = ["Contrat cadre", "Commande ponctuelle", "Appel d'offres",
 const DELAIS_PAIEMENT = ["30 jours date de facture", "30 jours fdm", "45 jours fdm", "60 jours", "variable"];
 const INCOTERMS = ["EXW", "FCA", "CPT", "CIP", "DAP", "DPU", "DDP", "FAS", "FOB", "CFR", "CIF"];
 
-export function SupplierDetailDrawer({ supplierId, open, onClose, canEdit = true, isAdmin = false }: SupplierDetailDrawerProps) {
+export function SupplierDetailDrawer({ supplierId, open, onClose, canEdit = true, isAdmin = false, canDelete = false }: SupplierDetailDrawerProps) {
   const queryClient = useQueryClient();
+  // Suppression autorisée pour les admins OU les porteurs de la permission can_delete_suppliers.
+  const canDeleteSupplier = isAdmin || canDelete;
   const [supplier, setSupplier] = useState<SupplierRow | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState<Partial<SupplierRow>>({});
@@ -146,6 +150,13 @@ export function SupplierDetailDrawer({ supplierId, open, onClose, canEdit = true
   const [attachments, setAttachments] = useState<SupplierAttachment[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Traçabilité : résolution des identifiants (valideurs / auteur MAJ) en noms lisibles.
+  const [profileNames, setProfileNames] = useState<Record<string, string>>({});
+  const nameFor = (id: string | null | undefined): string | null => {
+    if (!id) return null;
+    return profileNames[id] ?? id;
+  };
 
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     segmentation: true,
@@ -250,6 +261,39 @@ export function SupplierDetailDrawer({ supplierId, open, onClose, canEdit = true
     })();
     return () => { cancelled = true; };
   }, [open, supplierId]);
+
+  // Résout les noms des valideurs (Achats / Compta) et de l'auteur de la dernière
+  // MAJ pour la section Traçabilité. Les colonnes stockent des identifiants
+  // (auth user_id pour les validations issues de la promotion, profile.id pour
+  // updated_by) : on interroge les deux clés pour être robuste.
+  useEffect(() => {
+    const ids = [
+      supplier?.validated_by_achats_user_id,
+      supplier?.validated_by_compta_user_id,
+      supplier?.updated_by,
+    ].filter((v): v is string => Boolean(v));
+    if (ids.length === 0) {
+      setProfileNames({});
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("id, user_id, display_name")
+        .or(`user_id.in.(${ids.join(",")}),id.in.(${ids.join(",")})`);
+      if (cancelled || !data) return;
+      const map: Record<string, string> = {};
+      for (const p of data as { id: string; user_id: string | null; display_name: string | null }[]) {
+        if (p.display_name) {
+          if (p.user_id) map[p.user_id] = p.display_name;
+          if (p.id) map[p.id] = p.display_name;
+        }
+      }
+      setProfileNames(map);
+    })();
+    return () => { cancelled = true; };
+  }, [supplier?.validated_by_achats_user_id, supplier?.validated_by_compta_user_id, supplier?.updated_by]);
 
   // Debounced save
   useEffect(() => {
@@ -398,7 +442,7 @@ export function SupplierDetailDrawer({ supplierId, open, onClose, canEdit = true
   };
 
   const handleConfirmDeleteSupplier = async () => {
-    if (!supplierId || !isAdmin) return;
+    if (!supplierId || !canDeleteSupplier) return;
     setIsDeleting(true);
     setPendingSave(null);
     try {
@@ -489,7 +533,7 @@ export function SupplierDetailDrawer({ supplierId, open, onClose, canEdit = true
                       <Button onClick={handleMarkComplete} disabled={!canEdit || formData.status === "complet"}>
                         <Check className="h-4 w-4 mr-2" /> Marquer complet
                       </Button>
-                      {isAdmin ? (
+                      {canDeleteSupplier ? (
                         <Button
                           type="button"
                           variant="destructive"
@@ -945,30 +989,30 @@ export function SupplierDetailDrawer({ supplierId, open, onClose, canEdit = true
                           </div>
                         </div>
                         <div>
-                          <Label className="text-xs text-muted-foreground">Mis à jour par (profil)</Label>
-                          <div className="font-mono text-xs break-all mt-0.5">{formData.updated_by || "—"}</div>
+                          <Label className="text-xs text-muted-foreground">Mis à jour par</Label>
+                          <div className="font-medium mt-0.5 break-words">{nameFor(formData.updated_by) || "—"}</div>
                         </div>
                         <div>
                           <Label className="text-xs text-muted-foreground">Validé Achats</Label>
-                          <div className="mt-0.5">
-                            {formData.validated_by_achats_at
-                              ? format(new Date(formData.validated_by_achats_at), "dd/MM/yyyy HH:mm", { locale: fr })
-                              : "—"}
+                          <div className="font-medium mt-0.5 break-words">
+                            {nameFor(supplier.validated_by_achats_user_id) || "—"}
                           </div>
-                          {formData.validated_by_achats_user_id ? (
-                            <div className="text-xs text-muted-foreground font-mono break-all">{formData.validated_by_achats_user_id}</div>
-                          ) : null}
+                          <div className="text-xs text-muted-foreground mt-0.5">
+                            {supplier.validated_by_achats_at
+                              ? format(new Date(supplier.validated_by_achats_at), "dd/MM/yyyy 'à' HH:mm", { locale: fr })
+                              : "En attente"}
+                          </div>
                         </div>
                         <div>
-                          <Label className="text-xs text-muted-foreground">Validé Compta</Label>
-                          <div className="mt-0.5">
-                            {formData.validated_by_compta_at
-                              ? format(new Date(formData.validated_by_compta_at), "dd/MM/yyyy HH:mm", { locale: fr })
-                              : "—"}
+                          <Label className="text-xs text-muted-foreground">Validé Comptabilité</Label>
+                          <div className="font-medium mt-0.5 break-words">
+                            {nameFor(supplier.validated_by_compta_user_id) || "—"}
                           </div>
-                          {formData.validated_by_compta_user_id ? (
-                            <div className="text-xs text-muted-foreground font-mono break-all">{formData.validated_by_compta_user_id}</div>
-                          ) : null}
+                          <div className="text-xs text-muted-foreground mt-0.5">
+                            {supplier.validated_by_compta_at
+                              ? format(new Date(supplier.validated_by_compta_at), "dd/MM/yyyy 'à' HH:mm", { locale: fr })
+                              : "En attente"}
+                          </div>
                         </div>
                       </div>
                       <p className="text-xs text-muted-foreground flex items-start gap-1.5">
@@ -986,7 +1030,7 @@ export function SupplierDetailDrawer({ supplierId, open, onClose, canEdit = true
         </DialogContent>
       </Dialog>
 
-      {isAdmin ? (
+      {canDeleteSupplier ? (
         <AlertDialog
           open={deleteConfirmOpen}
           onOpenChange={(next) => {
