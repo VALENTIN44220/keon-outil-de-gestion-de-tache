@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import {
   FileSpreadsheet, Download, Users, Building2, Truck, ClipboardList,
-  ChevronDown, ChevronRight, Filter,
+  ChevronDown, ChevronRight, Filter, Printer,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -101,6 +101,88 @@ function exportXlsx(data: Record<string, any>[], sheetName: string, filename: st
   XLSX.utils.book_append_sheet(wb, ws, sheetName);
   XLSX.writeFile(wb, filename);
   toast.success(`Export : ${filename}`);
+}
+
+// ── PDF (A4 imprimable) export helper ────────────────────────────────────────
+
+interface PdfColumn { key: string; label: string; align?: 'left' | 'right' }
+
+/**
+ * Génère un document A4 imprimable (en-tête + tableau) et ouvre la boîte
+ * d'impression du navigateur (« Enregistrer au format PDF »). Sans dépendance :
+ * un iframe hors-écran porte un HTML paginé pour l'impression.
+ */
+function exportPdf(opts: {
+  title: string;
+  subtitle?: string;
+  columns: PdfColumn[];
+  rows: Record<string, string | number>[];
+  footRow?: Record<string, string | number>;
+}) {
+  const { title, subtitle, columns, rows, footRow } = opts;
+  if (rows.length === 0) return;
+
+  const now = new Date();
+  const dateStr = `${now.toLocaleDateString('fr-FR')} ${now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`;
+  const esc = (s: unknown) =>
+    String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
+
+  const thead = columns.map((c) => `<th style="text-align:${c.align ?? 'left'}">${esc(c.label)}</th>`).join('');
+  const tbody = rows
+    .map((r) => '<tr>' + columns.map((c) => `<td style="text-align:${c.align ?? 'left'}">${esc(r[c.key])}</td>`).join('') + '</tr>')
+    .join('');
+  const tfoot = footRow
+    ? '<tr class="total">' + columns.map((c) => `<td style="text-align:${c.align ?? 'left'}">${esc(footRow[c.key] ?? '')}</td>`).join('') + '</tr>'
+    : '';
+
+  const html = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>${esc(title)}</title>
+<style>
+  @page { size: A4; margin: 14mm; }
+  * { box-sizing: border-box; }
+  body { font-family: Arial, Helvetica, sans-serif; color: #111; font-size: 10px; margin: 0; }
+  .header { border-bottom: 2px solid #b45309; padding-bottom: 8px; margin-bottom: 12px; }
+  .header .kicker { font-size: 9px; letter-spacing: .12em; text-transform: uppercase; color: #b45309; font-weight: bold; }
+  .header h1 { font-size: 16px; margin: 2px 0; color: #1c1917; }
+  .header .sub { font-size: 10px; color: #444; }
+  .header .meta { font-size: 9px; color: #666; margin-top: 4px; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { border: 1px solid #d6d3d1; padding: 4px 6px; }
+  thead th { background: #f5f5f4; font-size: 8.5px; text-transform: uppercase; letter-spacing: .02em; }
+  tbody tr:nth-child(even) td { background: #fafaf9; }
+  tr.total td { background: #f5f3ff; font-weight: bold; }
+  thead { display: table-header-group; }
+  tr { page-break-inside: avoid; }
+  .foot { position: fixed; bottom: 6mm; left: 0; right: 0; text-align: center; font-size: 8px; color: #a8a29e; }
+</style></head>
+<body>
+  <div class="header">
+    <div class="kicker">Groupe KEON — Équipements de Protection Individuelle</div>
+    <h1>${esc(title)}</h1>
+    ${subtitle ? `<div class="sub">${esc(subtitle)}</div>` : ''}
+    <div class="meta">Document généré le ${esc(dateStr)} — ${rows.length} ligne(s)</div>
+  </div>
+  <table><thead><tr>${thead}</tr></thead><tbody>${tbody}${tfoot}</tbody></table>
+  <div class="foot">Synthèse EPI — usage interne</div>
+</body></html>`;
+
+  const iframe = document.createElement('iframe');
+  iframe.setAttribute('aria-hidden', 'true');
+  Object.assign(iframe.style, { position: 'fixed', right: '0', bottom: '0', width: '0', height: '0', border: '0' });
+  document.body.appendChild(iframe);
+  const doc = iframe.contentWindow?.document;
+  if (!doc) { iframe.remove(); return; }
+  doc.open();
+  doc.write(html);
+  doc.close();
+
+  const cleanup = () => setTimeout(() => iframe.remove(), 1000);
+  iframe.contentWindow?.addEventListener('afterprint', cleanup);
+  setTimeout(() => {
+    iframe.contentWindow?.focus();
+    iframe.contentWindow?.print();
+  }, 300);
+  setTimeout(cleanup, 60000);
+  toast.success('Document PDF prêt à imprimer / enregistrer');
 }
 
 // ── Main component ──────────────────────────────────────────────────────────
@@ -288,6 +370,35 @@ function SyntheseFournisseur({ requests }: { requests: EPIRequest[] }) {
     );
   };
 
+  const handleExportPdf = () => {
+    exportPdf({
+      title: 'Synthèse des commandes fournisseur EPI',
+      subtitle: `${rows.length} référence(s) — Total ${fmtEur(grandTotal)}`,
+      columns: [
+        { key: 'ref', label: 'Référence' },
+        { key: 'designation', label: 'Désignation' },
+        { key: 'taille', label: 'Taille' },
+        { key: 'qteTotal', label: 'Qté totale', align: 'right' },
+        { key: 'qteCmdee', label: 'Qté cmdée', align: 'right' },
+        { key: 'qteAttribuee', label: 'Qté attribuée', align: 'right' },
+        { key: 'prixUnit', label: 'Prix unit. HT', align: 'right' },
+        { key: 'totalHT', label: 'Total HT', align: 'right' },
+      ],
+      rows: rows.map(r => ({
+        ref: r.ref, designation: r.designation, taille: r.taille,
+        qteTotal: r.qteTotal, qteCmdee: r.qteCmdee, qteAttribuee: r.qteAttribuee,
+        prixUnit: fmtEur(r.prixUnit), totalHT: fmtEur(r.totalHT),
+      })),
+      footRow: {
+        ref: 'TOTAL',
+        qteTotal: rows.reduce((s, r) => s + r.qteTotal, 0),
+        qteCmdee: rows.reduce((s, r) => s + r.qteCmdee, 0),
+        qteAttribuee: rows.reduce((s, r) => s + r.qteAttribuee, 0),
+        totalHT: fmtEur(grandTotal),
+      },
+    });
+  };
+
   return (
     <Card>
       <CardHeader className="py-3 px-4 flex-row items-center justify-between">
@@ -295,9 +406,14 @@ function SyntheseFournisseur({ requests }: { requests: EPIRequest[] }) {
           <Truck className="h-4 w-4" /> Synthèse commandes fournisseur
           <Badge variant="secondary" className="text-xs">{rows.length} réf.</Badge>
         </CardTitle>
-        <Button size="sm" variant="outline" onClick={handleExport} disabled={rows.length === 0}>
-          <Download className="h-3 w-3 mr-1" /> Export XLSX
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={handleExportPdf} disabled={rows.length === 0}>
+            <Printer className="h-3 w-3 mr-1" /> Export PDF
+          </Button>
+          <Button size="sm" variant="outline" onClick={handleExport} disabled={rows.length === 0}>
+            <Download className="h-3 w-3 mr-1" /> Export XLSX
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="px-4 pb-4">
         {rows.length === 0 ? (
@@ -384,6 +500,35 @@ function SyntheseFiliale({ requests }: { requests: EPIRequest[] }) {
     exportXlsx(data, 'Devis par filiale', `devis_filiale_epi_${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
+  const handleExportPdf = () => {
+    const rows: Record<string, string | number>[] = [];
+    let grandTotal = 0;
+    for (const [fil, { lines }] of byFiliale) {
+      for (const l of lines) {
+        grandTotal += l.qte * l.prix;
+        rows.push({
+          filiale: fil, ref: l.ref, designation: l.designation, taille: l.taille,
+          qte: l.qte, prix: fmtEur(l.prix), total: fmtEur(l.qte * l.prix),
+        });
+      }
+    }
+    exportPdf({
+      title: 'Synthèse EPI par filiale',
+      subtitle: `${byFiliale.length} filiale(s) — Total ${fmtEur(grandTotal)}`,
+      columns: [
+        { key: 'filiale', label: 'Filiale' },
+        { key: 'ref', label: 'Référence' },
+        { key: 'designation', label: 'Désignation' },
+        { key: 'taille', label: 'Taille' },
+        { key: 'qte', label: 'Qté', align: 'right' },
+        { key: 'prix', label: 'Prix unit. HT', align: 'right' },
+        { key: 'total', label: 'Total HT', align: 'right' },
+      ],
+      rows,
+      footRow: { filiale: 'TOTAL', total: fmtEur(grandTotal) },
+    });
+  };
+
   return (
     <Card>
       <CardHeader className="py-3 px-4 flex-row items-center justify-between">
@@ -391,9 +536,14 @@ function SyntheseFiliale({ requests }: { requests: EPIRequest[] }) {
           <Building2 className="h-4 w-4" /> Synthèse par filiale
           <Badge variant="secondary" className="text-xs">{byFiliale.length} filiale(s)</Badge>
         </CardTitle>
-        <Button size="sm" variant="outline" onClick={handleExport} disabled={byFiliale.length === 0}>
-          <Download className="h-3 w-3 mr-1" /> Export XLSX
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={handleExportPdf} disabled={byFiliale.length === 0}>
+            <Printer className="h-3 w-3 mr-1" /> Export PDF
+          </Button>
+          <Button size="sm" variant="outline" onClick={handleExport} disabled={byFiliale.length === 0}>
+            <Download className="h-3 w-3 mr-1" /> Export XLSX
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="px-4 pb-4 space-y-2">
         {byFiliale.length === 0 ? (
@@ -507,6 +657,49 @@ function SyntheseIndividuel({ requests }: { requests: EPIRequest[] }) {
     exportXlsx(data, b.nom, `fiche_epi_${slug}_${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
+  const INDIV_PDF_COLUMNS: PdfColumn[] = [
+    { key: 'ref', label: 'Référence' },
+    { key: 'designation', label: 'Désignation' },
+    { key: 'taille', label: 'Taille' },
+    { key: 'qte', label: 'Qté', align: 'right' },
+    { key: 'prix', label: 'Prix unit. HT', align: 'right' },
+    { key: 'total', label: 'Total HT', align: 'right' },
+    { key: 'statut', label: 'Statut' },
+  ];
+
+  const handleExportPdf = () => {
+    const rows: Record<string, string | number>[] = [];
+    for (const [, b] of byBenef) {
+      for (const l of b.lines) {
+        rows.push({
+          collaborateur: b.nom, filiale: b.filiale, ref: l.ref, designation: l.designation,
+          taille: l.taille, qte: l.qte, prix: fmtEur(l.prix), total: fmtEur(l.qte * l.prix), statut: l.statut,
+        });
+      }
+    }
+    exportPdf({
+      title: 'Fiches individuelles EPI',
+      subtitle: `${byBenef.length} collaborateur(s)`,
+      columns: [{ key: 'collaborateur', label: 'Collaborateur' }, { key: 'filiale', label: 'Filiale' }, ...INDIV_PDF_COLUMNS],
+      rows,
+    });
+  };
+
+  const handleExportOnePdf = (bId: string) => {
+    const b = byBenef.find(([id]) => id === bId)?.[1];
+    if (!b) return;
+    exportPdf({
+      title: `Fiche de dotation EPI — ${b.nom}`,
+      subtitle: `Filiale : ${b.filiale} — Profil : ${b.profil} — Total ${fmtEur(b.total)}`,
+      columns: INDIV_PDF_COLUMNS,
+      rows: b.lines.map(l => ({
+        ref: l.ref, designation: l.designation, taille: l.taille, qte: l.qte,
+        prix: fmtEur(l.prix), total: fmtEur(l.qte * l.prix), statut: l.statut,
+      })),
+      footRow: { ref: 'TOTAL', total: fmtEur(b.total) },
+    });
+  };
+
   return (
     <Card>
       <CardHeader className="py-3 px-4 flex-row items-center justify-between">
@@ -514,9 +707,14 @@ function SyntheseIndividuel({ requests }: { requests: EPIRequest[] }) {
           <Users className="h-4 w-4" /> Fiches individuelles
           <Badge variant="secondary" className="text-xs">{byBenef.length} collaborateur(s)</Badge>
         </CardTitle>
-        <Button size="sm" variant="outline" onClick={handleExport} disabled={byBenef.length === 0}>
-          <Download className="h-3 w-3 mr-1" /> Export XLSX (tous)
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={handleExportPdf} disabled={byBenef.length === 0}>
+            <Printer className="h-3 w-3 mr-1" /> Export PDF (tous)
+          </Button>
+          <Button size="sm" variant="outline" onClick={handleExport} disabled={byBenef.length === 0}>
+            <Download className="h-3 w-3 mr-1" /> Export XLSX (tous)
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="px-4 pb-4 space-y-2">
         {byBenef.length === 0 ? (
@@ -536,7 +734,10 @@ function SyntheseIndividuel({ requests }: { requests: EPIRequest[] }) {
               </div>
               <div className="flex items-center gap-2">
                 <span className="font-mono text-sm font-medium">{fmtEur(b.total)}</span>
-                <Button size="sm" variant="ghost" className="h-7 px-2" onClick={(e) => { e.stopPropagation(); handleExportOne(bId); }}>
+                <Button size="sm" variant="ghost" className="h-7 px-2" title="Fiche PDF A4" onClick={(e) => { e.stopPropagation(); handleExportOnePdf(bId); }}>
+                  <Printer className="h-3 w-3" />
+                </Button>
+                <Button size="sm" variant="ghost" className="h-7 px-2" title="Export XLSX" onClick={(e) => { e.stopPropagation(); handleExportOne(bId); }}>
                   <Download className="h-3 w-3" />
                 </Button>
               </div>
@@ -633,6 +834,29 @@ function BilanAttributions() {
     );
   };
 
+  const handleExportPdf = () => {
+    exportPdf({
+      title: 'Bilan des attributions EPI',
+      subtitle: `${rows.length} attribution(s) enregistrée(s)`,
+      columns: [
+        { key: 'collaborateur', label: 'Collaborateur' },
+        { key: 'filiale', label: 'Filiale' },
+        { key: 'designation', label: 'Désignation' },
+        { key: 'categorie', label: 'Catégorie' },
+        { key: 'taille', label: 'Taille' },
+        { key: 'refSycomore', label: 'Réf.' },
+        { key: 'quantite', label: 'Qté', align: 'right' },
+        { key: 'campagne', label: 'Campagne' },
+        { key: 'dateAttribution', label: 'Date' },
+      ],
+      rows: rows.map(r => ({
+        collaborateur: r.collaborateur, filiale: r.filiale, designation: r.designation,
+        categorie: r.categorie, taille: r.taille, refSycomore: r.refSycomore,
+        quantite: r.quantite, campagne: r.campagne, dateAttribution: r.dateAttribution,
+      })),
+    });
+  };
+
   return (
     <Card>
       <CardHeader className="py-3 px-4 flex-row items-center justify-between">
@@ -640,9 +864,14 @@ function BilanAttributions() {
           <ClipboardList className="h-4 w-4" /> Historique des attributions
           <Badge variant="secondary" className="text-xs">{rows.length} attribution(s)</Badge>
         </CardTitle>
-        <Button size="sm" variant="outline" onClick={handleExport} disabled={rows.length === 0}>
-          <Download className="h-3 w-3 mr-1" /> Export XLSX
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={handleExportPdf} disabled={rows.length === 0}>
+            <Printer className="h-3 w-3 mr-1" /> Export PDF
+          </Button>
+          <Button size="sm" variant="outline" onClick={handleExport} disabled={rows.length === 0}>
+            <Download className="h-3 w-3 mr-1" /> Export XLSX
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="px-4 pb-4">
         {loading ? (
