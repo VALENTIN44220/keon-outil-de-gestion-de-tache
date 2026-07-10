@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
@@ -13,7 +13,10 @@ import {
   User,
   Globe,
   BarChart3,
+  Paperclip,
+  ExternalLink,
 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 import { useSupplierById } from '@/hooks/useSupplierEnrichment';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -206,6 +209,8 @@ export function SupplierSynthesisModal({ supplierId, open, onClose }: SupplierSy
                   <LongField label="Commentaires généraux" text={supplier.commentaires} />
                 </SynthesisFieldSection>
 
+                <SupplierAttachmentsReadOnly supplierId={supplier.id} />
+
                 <Separator />
 
                 <SupplierFinancialDashboard tiers={supplier.tiers} />
@@ -219,6 +224,65 @@ export function SupplierSynthesisModal({ supplierId, open, onClose }: SupplierSy
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+const ATTACHMENT_KIND_LABELS: Record<string, string> = {
+  rib: 'RIB',
+  justificatif_siret: 'Kbis / SIRET',
+  contrat: 'Contrat',
+  autre: 'Autre',
+};
+
+/** Section pièces jointes en lecture seule pour la vue consultation. */
+function SupplierAttachmentsReadOnly({ supplierId }: { supplierId: string }) {
+  const [attachments, setAttachments] = useState<
+    { id: string; file_name: string; storage_path: string; attachment_kind: string | null; created_at: string }[]
+  >([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const { data } = await supabase
+        .from('supplier_attachments')
+        .select('id, file_name, storage_path, attachment_kind, created_at')
+        .eq('supplier_id', supplierId)
+        .order('created_at', { ascending: false });
+      if (!cancelled) setAttachments((data as typeof attachments) ?? []);
+    })();
+    return () => { cancelled = true; };
+  }, [supplierId]);
+
+  const openAttachment = async (storagePath: string) => {
+    const { data } = await supabase.storage.from('supplier-attachments').createSignedUrl(storagePath, 60 * 60);
+    if (data?.signedUrl) window.open(data.signedUrl, '_blank');
+  };
+
+  return (
+    <SynthesisFieldSection title="Pièces jointes" icon={<Paperclip className="h-4 w-4 text-primary" />}>
+      {attachments.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Aucune pièce jointe</p>
+      ) : (
+        <div className="space-y-2">
+          {attachments.map((att) => (
+            <div key={att.id} className="flex items-center gap-2 p-2 rounded-lg border bg-muted/30">
+              <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+              <Badge variant="secondary" className="text-[10px] font-normal shrink-0">
+                {ATTACHMENT_KIND_LABELS[att.attachment_kind ?? 'autre'] ?? att.attachment_kind ?? 'Autre'}
+              </Badge>
+              <button
+                onClick={() => openAttachment(att.storage_path)}
+                className="text-sm font-medium hover:underline flex items-center gap-1 text-left min-w-0"
+              >
+                <span className="truncate">{att.file_name}</span>
+                <ExternalLink className="h-3 w-3 shrink-0" />
+              </button>
+              <span className="text-xs text-muted-foreground ml-auto shrink-0">{safeFormatDate(att.created_at)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </SynthesisFieldSection>
   );
 }
 
