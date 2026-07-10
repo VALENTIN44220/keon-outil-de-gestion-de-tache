@@ -45,6 +45,14 @@ export function NewSupplierRequestDialog({ open, onClose }: NewSupplierRequestDi
   }, [open]);
 
   const [entite, setEntite] = useState('');
+  const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
+  useEffect(() => {
+    if (!open) return;
+    void (async () => {
+      const { data } = await supabase.from('companies').select('id, name').order('name');
+      if (data) setCompanies(data);
+    })();
+  }, [open]);
   const [nomSociete, setNomSociete] = useState('');
   const [raison, setRaison] = useState('');
   const [famille, setFamille] = useState('');
@@ -263,7 +271,13 @@ export function NewSupplierRequestDialog({ open, onClose }: NewSupplierRequestDi
               <section className="rounded-xl border border-border bg-muted/30 p-4 space-y-4" aria-label="Informations fournisseur">
                 <div className="space-y-2">
                   <Label>Entité concernée par la demande de création *</Label>
-                  <Input value={entite} onChange={(e) => setEntite(e.target.value)} placeholder="Ex. NASKEO…" />
+                  <SearchableSelect
+                    value={entite}
+                    onValueChange={setEntite}
+                    options={companies.map((c) => ({ value: c.name, label: c.name }))}
+                    placeholder="Sélectionner une entité du groupe…"
+                    searchPlaceholder="Rechercher une entité…"
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>Entité sociale / Nom du fournisseur *</Label>

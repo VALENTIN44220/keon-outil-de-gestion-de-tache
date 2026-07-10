@@ -53,6 +53,7 @@ export async function migrateWaitingAttachmentsToEnrichment(
       file_url: signed?.signedUrl ?? '',
       storage_path: newPath,
       uploaded_by: user?.id ?? null,
+      attachment_kind: att.attachment_kind ?? null,
     });
     if (insErr) {
       console.error('supplier_attachments insert', insErr);

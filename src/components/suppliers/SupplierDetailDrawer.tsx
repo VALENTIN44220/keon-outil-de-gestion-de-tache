@@ -118,7 +118,21 @@ interface SupplierAttachment {
   file_name: string;
   file_url: string;
   storage_path: string;
+  attachment_kind: string | null;
   created_at: string;
+}
+
+// Types de pièces jointes d'une fiche fournisseur.
+const ATTACHMENT_KINDS = [
+  { value: 'rib', label: 'RIB' },
+  { value: 'justificatif_siret', label: 'Kbis / SIRET' },
+  { value: 'contrat', label: 'Contrat' },
+  { value: 'autre', label: 'Autre' },
+] as const;
+
+function attachmentKindLabel(kind: string | null | undefined): string {
+  if (!kind) return 'Autre';
+  return ATTACHMENT_KINDS.find((k) => k.value === kind)?.label ?? kind;
 }
 
 const SEGMENTS = ["Production", "Services", "IT", "Maintenance", "Transport", "Énergie", "Autre"];
@@ -149,6 +163,7 @@ export function SupplierDetailDrawer({ supplierId, open, onClose, canEdit = true
   // Attachments
   const [attachments, setAttachments] = useState<SupplierAttachment[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadKind, setUploadKind] = useState<string>('contrat');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Traçabilité : résolution des identifiants (valideurs / auteur MAJ) en noms lisibles.
@@ -417,6 +432,7 @@ export function SupplierDetailDrawer({ supplierId, open, onClose, canEdit = true
           file_url: fileUrl,
           storage_path: storagePath,
           uploaded_by: user.id,
+          attachment_kind: uploadKind,
         });
       if (insertError) throw insertError;
 
@@ -899,13 +915,18 @@ export function SupplierDetailDrawer({ supplierId, open, onClose, canEdit = true
                             <div key={att.id} className="flex items-center gap-2 p-2 rounded-lg border bg-muted/30">
                               <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
                               <div className="flex-1 min-w-0">
-                                <button
-                                  onClick={() => handleViewAttachment(att)}
-                                  className="text-sm font-medium hover:underline flex items-center gap-1 text-left"
-                                >
-                                  {att.file_name}
-                                  <ExternalLink className="h-3 w-3 shrink-0" />
-                                </button>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <Badge variant="secondary" className="text-[10px] font-normal shrink-0">
+                                    {attachmentKindLabel(att.attachment_kind)}
+                                  </Badge>
+                                  <button
+                                    onClick={() => handleViewAttachment(att)}
+                                    className="text-sm font-medium hover:underline flex items-center gap-1 text-left min-w-0"
+                                  >
+                                    <span className="truncate">{att.file_name}</span>
+                                    <ExternalLink className="h-3 w-3 shrink-0" />
+                                  </button>
+                                </div>
                                 <p className="text-xs text-muted-foreground">
                                   {format(new Date(att.created_at), "dd/MM/yyyy HH:mm", { locale: fr })}
                                 </p>
@@ -921,13 +942,23 @@ export function SupplierDetailDrawer({ supplierId, open, onClose, canEdit = true
                       )}
 
                       {canEdit && (
-                        <div>
+                        <div className="flex flex-col sm:flex-row gap-2 sm:items-end">
+                          <div className="space-y-1.5 sm:w-56">
+                            <Label className="text-xs text-muted-foreground">Type de pièce</Label>
+                            <SearchableSelect
+                              value={uploadKind}
+                              onValueChange={setUploadKind}
+                              options={ATTACHMENT_KINDS.map((k) => ({ value: k.value, label: k.label }))}
+                              placeholder="Type…"
+                              searchPlaceholder="Rechercher…"
+                            />
+                          </div>
                           <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileUpload} disabled={isUploading} />
-                          <Button type="button" variant="outline" className="w-full" onClick={() => fileInputRef.current?.click()} disabled={isUploading}>
+                          <Button type="button" variant="outline" className="flex-1" onClick={() => fileInputRef.current?.click()} disabled={isUploading}>
                             {isUploading ? (
                               <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Téléchargement...</>
                             ) : (
-                              <><Upload className="h-4 w-4 mr-2" /> Ajouter un fichier</>
+                              <><Upload className="h-4 w-4 mr-2" /> Ajouter un fichier ({attachmentKindLabel(uploadKind)})</>
                             )}
                           </Button>
                         </div>

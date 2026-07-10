@@ -6951,6 +6951,7 @@ export type Database = {
       }
       supplier_attachments: {
         Row: {
+          attachment_kind: string | null
           created_at: string
           file_name: string
           file_url: string
@@ -6960,6 +6961,7 @@ export type Database = {
           uploaded_by: string | null
         }
         Insert: {
+          attachment_kind?: string | null
           created_at?: string
           file_name: string
           file_url: string
@@ -6969,6 +6971,7 @@ export type Database = {
           uploaded_by?: string | null
         }
         Update: {
+          attachment_kind?: string | null
           created_at?: string
           file_name?: string
           file_url?: string
