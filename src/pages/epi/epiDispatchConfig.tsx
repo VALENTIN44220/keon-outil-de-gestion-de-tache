@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   HardHat, AlertTriangle, Clock, ListChecks, Trash2,
-  User, Calendar, Boxes, Euro, FileText, Truck, FileSpreadsheet,
+  User, Calendar, Boxes, Euro, FileText, Truck, FileSpreadsheet, History,
 } from 'lucide-react';
 import EPISyntheses from '@/pages/epi/EPISyntheses';
 import { Badge } from '@/components/ui/badge';
@@ -32,6 +32,7 @@ const STATUT_COLORS: Record<string, string> = {
   en_attente: 'bg-amber-100 text-amber-800 border-amber-300',
   validee: 'bg-blue-100 text-blue-800 border-blue-300',
   commandee: 'bg-purple-100 text-purple-800 border-purple-300',
+  receptionnee: 'bg-teal-100 text-teal-800 border-teal-300',
   attribuee: 'bg-emerald-100 text-emerald-800 border-emerald-300',
   annulee: 'bg-red-100 text-red-800 border-red-300',
 };
@@ -39,19 +40,26 @@ const STATUT_COLORS: Record<string, string> = {
 const EPI_STATUS_LABELS: Record<string, string> = {
   todo: 'Soumise',
   'in-progress': 'En cours de traitement',
-  commandee: 'Commandée fournisseur',
-  attribuee: 'Attribuée',
+  en_attente_reception: 'En attente de réception',
+  receptionnee: 'Réceptionnée — en attente de distribution',
+  dotation_affectee: 'Dotation affectée',
   done: 'Clôturée',
   cancelled: 'Annulée',
+  // Statuts historiques (compat)
+  commandee: 'Commandée fournisseur',
+  attribuee: 'Attribuée',
 };
 
 const EPI_STATUS_COLORS: Record<string, string> = {
   todo: 'bg-amber-100 text-amber-800 border-amber-300',
   'in-progress': 'bg-blue-100 text-blue-800 border-blue-300',
-  commandee: 'bg-purple-100 text-purple-800 border-purple-300',
-  attribuee: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+  en_attente_reception: 'bg-purple-100 text-purple-800 border-purple-300',
+  receptionnee: 'bg-teal-100 text-teal-800 border-teal-300',
+  dotation_affectee: 'bg-emerald-100 text-emerald-800 border-emerald-300',
   done: 'bg-slate-100 text-slate-800 border-slate-300',
   cancelled: 'bg-red-100 text-red-800 border-red-300',
+  commandee: 'bg-purple-100 text-purple-800 border-purple-300',
+  attribuee: 'bg-emerald-100 text-emerald-800 border-emerald-300',
 };
 
 const TYPE_COLORS: Record<string, string> = {
@@ -63,6 +71,25 @@ const EPI_TERMINAL = ['done', 'cancelled'];
 
 const fmtEur = (v: number) =>
   new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
+
+// Historise une transition de statut de la demande EPI (audit des étapes).
+const logEpiStatus = async (taskId: string, from: string | null, to: string, note?: string) => {
+  try {
+    const { data: u } = await supabase.auth.getUser();
+    let changedBy: string | null = null;
+    if (u.user) {
+      // epi_status_history.changed_by référence profiles.id (pas l'auth uid).
+      const { data: p } = await supabase.from('profiles').select('id').eq('user_id', u.user.id).maybeSingle();
+      changedBy = (p as { id: string } | null)?.id ?? null;
+    }
+    await supabase.from('epi_status_history' as any).insert({
+      request_id: taskId, from_status: from, to_status: to, note: note ?? null, changed_by: changedBy,
+    });
+  } catch (e) {
+    // Historisation best-effort : ne bloque pas la transition.
+    console.error('logEpiStatus', e);
+  }
+};
 
 const deleteRequest = async (id: string, refetch: () => void) => {
   if (!confirm('Supprimer définitivement cette demande EPI ?')) return;
@@ -245,8 +272,10 @@ function EPIRowActions({ request: r, ctx }: { request: EPIRequest; ctx: ModuleRo
 
   const handleValidate = async () => {
     try {
-      await supabase.from('tasks').update({ status: 'in-progress' }).eq('id', r.task_id);
+      const { error } = await supabase.from('tasks').update({ status: 'in-progress' }).eq('id', r.task_id);
+      if (error) throw error;
       await supabase.from('epi_demande_lignes' as any).update({ statut: 'validee' }).eq('request_id', r.task_id);
+      await logEpiStatus(r.task_id, r.status, 'in-progress', 'Demande validée');
       toast.success('Demande validée');
       ctx.refetch();
     } catch (e: any) {
@@ -257,8 +286,10 @@ function EPIRowActions({ request: r, ctx }: { request: EPIRequest; ctx: ModuleRo
   const handleRefuse = async () => {
     if (!confirm('Refuser cette demande EPI ?')) return;
     try {
-      await supabase.from('tasks').update({ status: 'cancelled' }).eq('id', r.task_id);
+      const { error } = await supabase.from('tasks').update({ status: 'cancelled' }).eq('id', r.task_id);
+      if (error) throw error;
       await supabase.from('epi_demande_lignes' as any).update({ statut: 'annulee' }).eq('request_id', r.task_id);
+      await logEpiStatus(r.task_id, r.status, 'cancelled', 'Demande refusée');
       toast.success('Demande refusée');
       ctx.refetch();
     } catch (e: any) {
@@ -309,6 +340,20 @@ function EPIDetailDialog({ request, open, onClose, refetch, isAdmin, profilesMap
   const [refCommande, setRefCommande] = useState(request.ref_commande_divalto ?? '');
   const [refBl, setRefBl] = useState(request.ref_bl_divalto ?? '');
   const [refFacture, setRefFacture] = useState(request.ref_facture_divalto ?? '');
+
+  // Historique des étapes de traitement (epi_status_history).
+  const [history, setHistory] = useState<Array<{ id: string; from_status: string | null; to_status: string; note: string | null; changed_by: string | null; created_at: string }>>([]);
+  useEffect(() => {
+    if (!open) return;
+    void (async () => {
+      const { data } = await supabase
+        .from('epi_status_history' as any)
+        .select('id, from_status, to_status, note, changed_by, created_at')
+        .eq('request_id', request.task_id)
+        .order('created_at', { ascending: true });
+      setHistory((data as any) ?? []);
+    })();
+  }, [open, request.task_id, request.status]);
 
   const fmtDay = (iso: string | null | undefined) =>
     iso ? format(parseISO(iso), 'dd/MM/yyyy', { locale: fr }) : '—';
@@ -446,76 +491,103 @@ function EPIDetailDialog({ request, open, onClose, refetch, isAdmin, profilesMap
     });
   }
 
+  if (history.length > 0) {
+    sections.push({
+      title: 'Historique du traitement',
+      icon: <History className="h-3 w-3" />,
+      content: (
+        <ol className="space-y-2">
+          {history.map((h) => (
+            <li key={h.id} className="flex items-start gap-2 text-xs">
+              <Badge variant="outline" className={cn('shrink-0', EPI_STATUS_COLORS[h.to_status])}>
+                {EPI_STATUS_LABELS[h.to_status] ?? h.to_status}
+              </Badge>
+              <div className="min-w-0">
+                <div className="text-muted-foreground">
+                  {format(parseISO(h.created_at), 'dd/MM/yyyy HH:mm', { locale: fr })}
+                  {h.changed_by ? <> — {profilesMap.get(h.changed_by) ?? '—'}</> : null}
+                </div>
+                {h.note ? <div className="text-foreground/80">{h.note}</div> : null}
+              </div>
+            </li>
+          ))}
+        </ol>
+      ),
+    });
+  }
+
+  // Transition générique : maj tasks.status (+ éventuel statut des lignes),
+  // historisation et rafraîchissement, avec remontée d'erreur explicite.
+  const runTransition = async (newStatus: string, ligneStatut: string | null, successMsg: string) => {
+    try {
+      const { error } = await supabase.from('tasks').update({ status: newStatus }).eq('id', request.task_id);
+      if (error) throw error;
+      if (ligneStatut) {
+        const { error: lErr } = await supabase.from('epi_demande_lignes' as any).update({ statut: ligneStatut }).eq('request_id', request.task_id);
+        if (lErr) throw lErr;
+      }
+      await logEpiStatus(request.task_id, request.status, newStatus, successMsg);
+      toast.success(successMsg);
+      refetch();
+    } catch (e: any) {
+      toast.error(`Erreur : ${e.message}`);
+    }
+  };
+
+  // Étape « Affecter la dotation » : passe la demande en dotation_affectee, les
+  // lignes en attribuee, et historise chaque dotation dans epi_attributions
+  // (avec le vrai taille_id, récupéré depuis epi_demande_lignes).
+  const runDotation = async () => {
+    try {
+      const { data: lignes, error: lErr } = await supabase
+        .from('epi_demande_lignes' as any)
+        .select('id, article_id, taille_id, quantite')
+        .eq('request_id', request.task_id);
+      if (lErr) throw lErr;
+
+      const { error: tErr } = await supabase.from('tasks').update({ status: 'dotation_affectee' }).eq('id', request.task_id);
+      if (tErr) throw tErr;
+      const { error: sErr } = await supabase.from('epi_demande_lignes' as any).update({ statut: 'attribuee' }).eq('request_id', request.task_id);
+      if (sErr) throw sErr;
+
+      if (request.beneficiaire_id && lignes && lignes.length > 0) {
+        const attributions = (lignes as any[]).map((l) => ({
+          demande_ligne_id: l.id,
+          beneficiaire_id: request.beneficiaire_id!,
+          article_id: l.article_id,
+          taille_id: l.taille_id,
+          quantite: l.quantite,
+          campagne_annee: request.type_demande === 'dotation_annuelle' ? new Date().getFullYear() : null,
+        }));
+        const { error: aErr } = await supabase.from('epi_attributions' as any).insert(attributions);
+        if (aErr) throw aErr;
+      }
+
+      await logEpiStatus(request.task_id, request.status, 'dotation_affectee', 'Dotation affectée au bénéficiaire');
+      toast.success('Dotation affectée et historisée');
+      refetch();
+    } catch (e: any) {
+      toast.error(`Erreur : ${e.message}`);
+    }
+  };
+
   const statusActions: DetailStatusAction[] = [];
-  if (request.status === 'todo' && canManage) {
-    statusActions.push({
-      key: 'val',
-      label: 'Valider',
-      onClick: async () => {
-        await supabase.from('tasks').update({ status: 'in-progress' }).eq('id', request.task_id);
-        await supabase.from('epi_demande_lignes' as any).update({ statut: 'validee' }).eq('request_id', request.task_id);
-        toast.success('Demande validée');
-        refetch();
-      },
-    });
-    statusActions.push({
-      key: 'ref',
-      label: 'Refuser',
-      variant: 'outline',
-      onClick: async () => {
-        if (!confirm('Refuser cette demande EPI ?')) return;
-        await supabase.from('tasks').update({ status: 'cancelled' }).eq('id', request.task_id);
-        await supabase.from('epi_demande_lignes' as any).update({ statut: 'annulee' }).eq('request_id', request.task_id);
-        toast.success('Demande refusée');
-        refetch();
-      },
-    });
-  } else if (request.status === 'in-progress' && canManage) {
-    statusActions.push({
-      key: 'cmd',
-      label: 'Marquer commandée',
-      onClick: async () => {
-        await supabase.from('tasks').update({ status: 'commandee' }).eq('id', request.task_id);
-        await supabase.from('epi_demande_lignes' as any).update({ statut: 'commandee' }).eq('request_id', request.task_id);
-        toast.success('Demande marquée commandée');
-        refetch();
-      },
-    });
-  } else if (request.status === 'commandee' && canManage) {
-    statusActions.push({
-      key: 'attr',
-      label: 'Marquer attribuée',
-      onClick: async () => {
-        await supabase.from('tasks').update({ status: 'attribuee' }).eq('id', request.task_id);
-        await supabase.from('epi_demande_lignes' as any).update({ statut: 'attribuee' }).eq('request_id', request.task_id);
-
-        if (request.beneficiaire_id) {
-          const attributions = (request.lignes ?? []).map(l => ({
-            beneficiaire_id: request.beneficiaire_id!,
-            article_id: l.article_id,
-            taille_id: l.id,
-            quantite: l.quantite,
-            campagne_annee: request.type_demande === 'dotation_annuelle' ? new Date().getFullYear() : null,
-          }));
-          if (attributions.length > 0) {
-            await supabase.from('epi_attributions' as any).insert(attributions);
-          }
-        }
-
-        toast.success('EPI attribués au bénéficiaire');
-        refetch();
-      },
-    });
-  } else if (request.status === 'attribuee' && canManage) {
-    statusActions.push({
-      key: 'close',
-      label: 'Clôturer',
-      onClick: async () => {
-        await supabase.from('tasks').update({ status: 'done' }).eq('id', request.task_id);
-        toast.success('Demande clôturée');
-        refetch();
-      },
-    });
+  if (canManage) {
+    if (request.status === 'todo') {
+      statusActions.push({ key: 'val', label: 'Valider', onClick: () => runTransition('in-progress', 'validee', 'Demande validée') });
+      statusActions.push({
+        key: 'ref', label: 'Refuser', variant: 'outline',
+        onClick: async () => { if (!confirm('Refuser cette demande EPI ?')) return; await runTransition('cancelled', 'annulee', 'Demande refusée'); },
+      });
+    } else if (request.status === 'in-progress') {
+      statusActions.push({ key: 'cmd', label: 'Marquer commandée', onClick: () => runTransition('en_attente_reception', 'commandee', 'Commande passée — en attente de réception') });
+    } else if (request.status === 'en_attente_reception' || request.status === 'commandee') {
+      statusActions.push({ key: 'rec', label: 'Valider la réception', onClick: () => runTransition('receptionnee', 'receptionnee', 'Marchandise réceptionnée — en attente de distribution') });
+    } else if (request.status === 'receptionnee') {
+      statusActions.push({ key: 'dot', label: 'Affecter la dotation', onClick: () => runDotation() });
+    } else if (request.status === 'dotation_affectee' || request.status === 'attribuee') {
+      statusActions.push({ key: 'close', label: 'Clôturer', onClick: () => runTransition('done', null, 'Demande clôturée') });
+    }
   }
 
   return (

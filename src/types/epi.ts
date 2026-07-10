@@ -10,7 +10,7 @@ export type EPIProfil =
   | 'encadrement_atex'
   | 'operationnel_atex';
 export type EPITypeDemande = 'ponctuelle' | 'dotation_annuelle';
-export type EPILigneStatut = 'en_attente' | 'validee' | 'commandee' | 'attribuee' | 'annulee';
+export type EPILigneStatut = 'en_attente' | 'validee' | 'commandee' | 'receptionnee' | 'attribuee' | 'annulee';
 
 export const EPI_PROFIL_LABELS: Record<EPIProfil, string> = {
   non_concerne: 'Non concerné',
@@ -37,6 +37,7 @@ export const EPI_LIGNE_STATUT_LABELS: Record<EPILigneStatut, string> = {
   en_attente: 'En attente',
   validee: 'Validée',
   commandee: 'Commandée',
+  receptionnee: 'Réceptionnée',
   attribuee: 'Attribuée',
   annulee: 'Annulée',
 };
