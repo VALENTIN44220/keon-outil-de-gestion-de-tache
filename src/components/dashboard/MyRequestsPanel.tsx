@@ -50,9 +50,12 @@ export function MyRequestsPanel({ currentUserId, className }: MyRequestsPanelPro
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
 
-  const fetchRequests = useCallback(async () => {
+  // silent = rafraîchissement en arrière-plan (temps réel) : on NE repasse PAS
+  // en état « chargement » pour éviter que tout le panneau soit démonté puis
+  // remonté à chaque événement — c'était la cause du clignotement (BUG-00016).
+  const fetchRequests = useCallback(async (opts?: { silent?: boolean }) => {
     if (!currentUserId) { setRequests([]); setIsLoading(false); return; }
-    setIsLoading(true);
+    if (!opts?.silent) setIsLoading(true);
     try {
       const { data, error } = await supabase
         .from('tasks')
@@ -65,19 +68,22 @@ export function MyRequestsPanel({ currentUserId, className }: MyRequestsPanelPro
     } catch (e) {
       console.error('MyRequestsPanel fetch:', e);
     } finally {
-      setIsLoading(false);
+      if (!opts?.silent) setIsLoading(false);
     }
   }, [currentUserId]);
 
+  // Chargement initial uniquement : affiche le spinner une seule fois.
   useEffect(() => { void fetchRequests(); }, [fetchRequests]);
 
-  // Mise à jour live du statut des demandes du demandeur.
+  // Mise à jour live des demandes du demandeur. Filtre limité à SES demandes
+  // (requester_id) au lieu de tout `type=request` : moins de refetch inutiles.
+  // Le refetch est « silencieux » → mise à jour en place, sans clignotement.
   useEffect(() => {
     if (!currentUserId) return;
     const ch = supabase
       .channel(`my-requests-panel-${currentUserId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks', filter: 'type=eq.request' }, () => {
-        void fetchRequests();
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks', filter: `requester_id=eq.${currentUserId}` }, () => {
+        void fetchRequests({ silent: true });
       })
       .subscribe();
     return () => { supabase.removeChannel(ch); };
