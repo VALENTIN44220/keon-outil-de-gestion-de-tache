@@ -18,6 +18,7 @@ import { formatTaskCalendarDate } from '@/lib/formatTaskDate';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { getTablePageSize, TABLE_PAGE_SIZE_EVENT } from '@/config/tableDisplay';
 
 interface DenseTableViewProps {
   tasks: Task[];
@@ -116,6 +117,31 @@ export function DenseTableView({ tasks, onStatusChange, onDelete, progressMap, o
   const [itProjectSearch, setItProjectSearch] = useState('');
 
   const { sortedData: sortedTasks, sortConfig, handleSort } = useTableSort<Task>(tasks, 'created_at', 'desc');
+
+  // Taille de page paramétrable depuis le mode admin (onglet « Affichage »).
+  const [pageSize, setPageSize] = useState(getTablePageSize);
+  useEffect(() => {
+    const onChange = () => setPageSize(getTablePageSize());
+    window.addEventListener(TABLE_PAGE_SIZE_EVENT, onChange);
+    window.addEventListener('storage', onChange);
+    return () => {
+      window.removeEventListener(TABLE_PAGE_SIZE_EVENT, onChange);
+      window.removeEventListener('storage', onChange);
+    };
+  }, []);
+
+  // Plafond de lignes rendues. Réinitialisé quand le périmètre change (filtres,
+  // rechargement) pour repartir d'un DOM léger et éviter les à-coups d'affichage.
+  const [displayLimit, setDisplayLimit] = useState(pageSize);
+  useEffect(() => {
+    setDisplayLimit(pageSize);
+  }, [tasks, pageSize]);
+
+  const limitedTasks = useMemo(
+    () => sortedTasks.slice(0, displayLimit),
+    [sortedTasks, displayLimit],
+  );
+  const hasMore = sortedTasks.length > limitedTasks.length;
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(visibleColumns));
@@ -416,7 +442,7 @@ export function DenseTableView({ tasks, onStatusChange, onDelete, progressMap, o
               // Vue groupée par demande
               if (groupBy === 'request') {
                 const groups = new Map<string, Task[]>();
-                for (const t of sortedTasks) {
+                for (const t of limitedTasks) {
                   const key = (t as any).parent_request_id || 'Sans demande';
                   if (!groups.has(key)) groups.set(key, []);
                   groups.get(key)!.push(t);
@@ -453,12 +479,37 @@ export function DenseTableView({ tasks, onStatusChange, onDelete, progressMap, o
               }
 
               // Vue plate
-              return sortedTasks.map(renderTaskRow);
+              return limitedTasks.map(renderTaskRow);
             })()}
           </TableBody>
         </Table>
       </div>
 
+      {hasMore && (
+        <div className="flex flex-col items-center gap-2 py-3">
+          <span className="text-xs text-muted-foreground">
+            {limitedTasks.length} sur {sortedTasks.length} tâches affichées
+          </span>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs border-keon-300"
+              onClick={() => setDisplayLimit((n) => n + pageSize)}
+            >
+              Afficher plus ({Math.min(pageSize, sortedTasks.length - limitedTasks.length)})
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-xs text-muted-foreground"
+              onClick={() => setDisplayLimit(sortedTasks.length)}
+            >
+              Tout afficher ({sortedTasks.length})
+            </Button>
+          </div>
+        </div>
+      )}
     </>
   );
 }
