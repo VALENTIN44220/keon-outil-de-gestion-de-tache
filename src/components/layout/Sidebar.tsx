@@ -1,7 +1,7 @@
 import React, { Fragment, useState, useEffect, useMemo } from 'react';
 import {
   ChevronLeft, ChevronRight, ArrowLeftRight,
-  Plus, Minus, ChevronsDownUp, ChevronsUpDown,
+  Plus, Minus, ChevronsDownUp, ChevronsUpDown, Search, X,
 } from 'lucide-react';
 import {
   menuGroups, adminMenuItem, getSectionColor,
@@ -147,6 +147,7 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
     return saved === 'true';
   });
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [menuSearch, setMenuSearch] = useState('');
   const [permissionProfileName, setPermissionProfileName] = useState<string | null>(null);
   const [isRightSide, setIsRightSide] = useState(() => {
     const saved = localStorage.getItem('sidebar-position');
@@ -235,6 +236,30 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
     return groups;
   }, [effectivePermissions, isAdmin, canAccessScreen, isPageVisibleOnDevice, currentDevice]);
 
+  // Recherche dans le menu (BUG-00015) : filtre les items par libellé.
+  const isSearchingMenu = menuSearch.trim().length > 0;
+  const displayedGroups = useMemo(() => {
+    if (!isSearchingMenu) return filteredGroups;
+    const q = menuSearch.trim().toLowerCase();
+    const matches = (it: SidebarMenuItem) => (it.label ?? '').toLowerCase().includes(q);
+    return filteredGroups
+      .map((group) => {
+        const items = group.items
+          .map((item): SidebarMenuItem | null => {
+            if (item.children?.length) {
+              const kids = item.children.filter(matches);
+              if (matches(item)) return item; // parent correspond : garde ses enfants
+              if (kids.length) return { ...item, children: kids };
+              return null;
+            }
+            return matches(item) ? item : null;
+          })
+          .filter((i): i is SidebarMenuItem => i != null);
+        return { ...group, items };
+      })
+      .filter((group) => group.items.length > 0);
+  }, [filteredGroups, isSearchingMenu, menuSearch]);
+
   const derivedActiveView = useMemo(() => {
     const pathname = location.pathname || '/';
     const allItems = flattenMenuItemsForMatch(filteredGroups);
@@ -312,6 +337,7 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
 
   const handleMenuClick = (itemId: string, path: string) => {
     onViewChange(itemId);
+    setMenuSearch('');
     const currentPath = window.location.pathname;
     if (path === '/') { if (currentPath !== '/') navigate('/'); }
     else if (currentPath !== path) navigate(path);
@@ -321,10 +347,36 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
   // ── Contenu navigation partagé mobile/desktop ─────────────────────────────
   const renderNav = (isCollapsed: boolean, isMob: boolean) => (
     <nav className="flex-1 overflow-y-auto px-2 py-1 space-y-0.5">
-      {filteredGroups.map((group, gi) => {
+      {!isCollapsed && (
+        <div className="relative px-1 pt-1 pb-1.5">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+          <input
+            type="text"
+            value={menuSearch}
+            onChange={(e) => setMenuSearch(e.target.value)}
+            placeholder="Rechercher un menu…"
+            aria-label="Rechercher dans le menu"
+            className="w-full h-8 rounded-lg border border-slate-200 bg-slate-50 pl-8 pr-7 text-[13px] text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-primary/40 focus:border-primary/40"
+          />
+          {menuSearch && (
+            <button
+              type="button"
+              onClick={() => setMenuSearch('')}
+              aria-label="Effacer la recherche"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      )}
+      {!isCollapsed && isSearchingMenu && displayedGroups.length === 0 && (
+        <p className="px-3 py-6 text-center text-[12px] text-slate-400">Aucun menu trouvé.</p>
+      )}
+      {displayedGroups.map((group, gi) => {
         const sectionColor = getSectionColor(group.label);
         const isActiveS = group.label === activeSectionLabel;
-        const expanded = isCollapsed || isSectionExpanded(group.label);
+        const expanded = isCollapsed || isSearchingMenu || isSectionExpanded(group.label);
 
         return (
           <div key={gi} className={gi > 0 ? 'pt-1' : ''}>
@@ -404,7 +456,7 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
             )}
 
             {/* Séparateur entre sections */}
-            {gi < filteredGroups.length - 1 && !isCollapsed && (
+            {gi < displayedGroups.length - 1 && !isCollapsed && (
               <div className="mx-2 mt-1.5 h-px bg-slate-100" />
             )}
           </div>
