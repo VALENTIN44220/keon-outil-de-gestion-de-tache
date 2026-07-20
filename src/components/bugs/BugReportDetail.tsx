@@ -70,10 +70,12 @@ export function BugReportDetail({ bug, open, onOpenChange, isAdmin }: BugReportD
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-base pr-6">
-            <span className="font-mono text-xs text-muted-foreground">{bug.ref}</span>
-            <Badge className={cn(typeCfg.className, 'border text-[10px]')}>{typeCfg.icon} {typeCfg.label}</Badge>
-            <span className="truncate">{bug.title}</span>
+          <DialogTitle className="text-base pr-6 space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-xs text-muted-foreground">{bug.ref}</span>
+              <Badge className={cn(typeCfg.className, 'border text-[10px]')}>{typeCfg.icon} {typeCfg.label}</Badge>
+            </div>
+            <span className="block break-words leading-snug" title={bug.title}>{bug.title}</span>
           </DialogTitle>
         </DialogHeader>
 
