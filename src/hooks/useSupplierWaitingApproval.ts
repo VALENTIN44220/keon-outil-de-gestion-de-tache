@@ -27,6 +27,7 @@ export type SupplierWaitingApprovalDetail = SupplierWaitingApprovalRow & {
   description: string | null;
   commentaires: string | null;
   tva: string | null;
+  zone_intervention: string[] | null;
   delai_de_paiement: string | null;
   ca_estime: number | null;
   nom_contact: string | null;
@@ -62,7 +63,7 @@ const LIST_SELECT =
 
 const DETAIL_SELECT =
   LIST_SELECT +
-  ',description,commentaires,tva,delai_de_paiement,ca_estime,' +
+  ',description,commentaires,tva,zone_intervention,delai_de_paiement,ca_estime,' +
   'nom_contact,adresse_mail,telephone,poste,' +
   'validated_by_achats_user_id,validated_by_compta_user_id,' +
   'supplier_waiting_approval_attachments(id,attachment_kind,file_name,file_url,storage_path),' +

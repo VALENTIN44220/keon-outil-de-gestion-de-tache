@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { MultiSelect } from '@/components/ui/multi-select';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useSupplierFamillesAll } from '@/hooks/useSupplierCategorisation';
@@ -25,6 +26,7 @@ import {
   SUPPLIER_DEMAND_FILE_ACCEPT,
   SUPPLIER_DEMAND_PAYS,
   SUPPLIER_DELAIS_PAIEMENT,
+  SUPPLIER_ZONE_INTERVENTION_OPTIONS,
 } from '@/lib/newSupplierDemandConstants';
 
 export interface NewSupplierRequestDialogProps {
@@ -59,6 +61,7 @@ export function NewSupplierRequestDialog({ open, onClose }: NewSupplierRequestDi
   const [famillesBrowserOpen, setFamillesBrowserOpen] = useState(false);
   const [description, setDescription] = useState('');
   const [pays, setPays] = useState('');
+  const [zoneIntervention, setZoneIntervention] = useState<string[]>([]);
   const [delaiPaiement, setDelaiPaiement] = useState('');
   const [caEstime, setCaEstime] = useState('');
   const [siret, setSiret] = useState('');
@@ -80,6 +83,7 @@ export function NewSupplierRequestDialog({ open, onClose }: NewSupplierRequestDi
     setFamille('');
     setDescription('');
     setPays('');
+    setZoneIntervention([]);
     setDelaiPaiement('');
     setCaEstime('');
     setSiret('');
@@ -159,6 +163,7 @@ export function NewSupplierRequestDialog({ open, onClose }: NewSupplierRequestDi
       famille: famille.trim(),
       description: description.trim(),
       pays: pays.trim(),
+      zone_intervention: zoneIntervention.length > 0 ? zoneIntervention : null,
       delai_de_paiement: delaiPaiement.trim(),
       ca_estime: ca,
       siret: siret.trim(),
@@ -270,7 +275,7 @@ export function NewSupplierRequestDialog({ open, onClose }: NewSupplierRequestDi
             <TabsContent value="informations" className="mt-4 space-y-4">
               <section className="rounded-xl border border-border bg-muted/30 p-4 space-y-4" aria-label="Informations fournisseur">
                 <div className="space-y-2">
-                  <Label>Entité concernée par la demande de création *</Label>
+                  <Label>Entité concernée par la demande de création (entité qui passe commande) *</Label>
                   <SearchableSelect
                     value={entite}
                     onValueChange={setEntite}
@@ -332,6 +337,19 @@ export function NewSupplierRequestDialog({ open, onClose }: NewSupplierRequestDi
                     allowCustom
                     customPlaceholder="Autre pays…"
                   />
+                </div>
+                <div className="space-y-2">
+                  <Label>Localisation du fournisseur (zone d'intervention)</Label>
+                  <MultiSelect
+                    value={zoneIntervention}
+                    onValueChange={setZoneIntervention}
+                    options={SUPPLIER_ZONE_INTERVENTION_OPTIONS}
+                    placeholder="Sélectionner un ou plusieurs départements, ou Régional / National…"
+                    searchPlaceholder="Rechercher un département…"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Précisez le ou les départements couverts, ou choisissez « Régional » / « National ». Facultatif.
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label>Délais de paiement *</Label>

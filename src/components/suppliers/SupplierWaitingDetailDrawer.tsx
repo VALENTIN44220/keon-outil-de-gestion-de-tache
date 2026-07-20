@@ -391,6 +391,14 @@ export function SupplierWaitingDetailDrawer({ waitingId, onClose }: Props) {
                         multiline={k === 'commentaires' || k === 'description'}
                       />
                     ))}
+                    <div className="space-y-0.5 sm:col-span-2">
+                      <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Zone d'intervention</p>
+                      <p className="text-sm">
+                        {data.zone_intervention && data.zone_intervention.length > 0
+                          ? data.zone_intervention.join(', ')
+                          : <span className="italic text-muted-foreground">Non renseigné</span>}
+                      </p>
+                    </div>
                     {!editMode && <div className="space-y-0.5"><p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">TIERS</p><p className="text-sm">{data.tiers ?? <span className="italic text-muted-foreground">Non renseigné</span>}</p></div>}
                   </div>
                 </div>

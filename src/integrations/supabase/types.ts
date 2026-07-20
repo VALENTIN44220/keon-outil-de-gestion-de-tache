@@ -7269,6 +7269,7 @@ export type Database = {
           validated_by_compta_user_id: string | null
           validite_du_contrat: string | null
           validite_prix: string | null
+          zone_intervention: string[] | null
         }
         Insert: {
           adresse_mail?: string | null
@@ -7326,6 +7327,7 @@ export type Database = {
           validated_by_compta_user_id?: string | null
           validite_du_contrat?: string | null
           validite_prix?: string | null
+          zone_intervention?: string[] | null
         }
         Update: {
           adresse_mail?: string | null
@@ -7383,6 +7385,7 @@ export type Database = {
           validated_by_compta_user_id?: string | null
           validite_du_contrat?: string | null
           validite_prix?: string | null
+          zone_intervention?: string[] | null
         }
         Relationships: []
       }
