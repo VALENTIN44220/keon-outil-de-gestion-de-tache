@@ -11,12 +11,20 @@ import { MicrosoftAccountLinkingDialog } from './MicrosoftAccountLinkingDialog';
 type ProfileGateRow = {
   id: string;
   lovable_status: string | null;
+  status: string | null;
   permission_profile_id: string | null;
   id_lucca: string | null;
 };
 
 function isKeonProvisionedProfile(row: ProfileGateRow): boolean {
   return Boolean(row.permission_profile_id || row.id_lucca);
+}
+
+// Comptes explicitement désactivés côté admin : accès refusé (BUG-00014).
+// On ne bloque QUE ces statuts ; `active`, `external` ou null passent.
+const DEACTIVATED_STATUSES = new Set(['suspended', 'deleted', 'inactive']);
+function isDeactivatedProfile(row: ProfileGateRow): boolean {
+  return row.status != null && DEACTIVATED_STATUSES.has(row.status);
 }
 
 function displayNameFromUser(user: User) {
@@ -115,7 +123,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
         const fetchMyProfileRow = async () =>
           supabase
             .from('profiles')
-            .select('id, lovable_status, permission_profile_id, id_lucca')
+            .select('id, lovable_status, status, permission_profile_id, id_lucca')
             .eq('user_id', sessionUser.id)
             .maybeSingle();
 
@@ -152,6 +160,13 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
           if (needsLink && !isKeonProvisionedProfile(data)) {
             setHasProfile(false);
             setShowLinkingDialog(true);
+            return;
+          }
+
+          // Compte désactivé par un admin → accès refusé + déconnexion.
+          if (isDeactivatedProfile(data)) {
+            setHasProfile(false);
+            setShowAccessDenied(true);
             return;
           }
 
