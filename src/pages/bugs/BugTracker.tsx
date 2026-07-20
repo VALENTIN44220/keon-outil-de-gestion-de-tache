@@ -149,7 +149,7 @@ export default function BugTracker() {
                           <tr key={b.id} onClick={() => setSelected(b)}
                             className="border-b hover:bg-muted/30 cursor-pointer transition-colors">
                             <td className="px-3 py-2.5 font-mono text-xs text-muted-foreground">{b.ref}</td>
-                            <td className="px-3 py-2.5 font-medium max-w-[320px] truncate">{b.title}</td>
+                            <td className="px-3 py-2.5 font-medium max-w-[320px] truncate" title={b.title}>{b.title}</td>
                             <td className="px-3 py-2.5"><Badge className={cn(tc.className, 'border text-[10px]')}>{tc.icon} {tc.label}</Badge></td>
                             <td className="px-3 py-2.5"><Badge className={cn(pc.className, 'border text-[10px]')}>{pc.label}</Badge></td>
                             <td className="px-3 py-2.5"><Badge className={cn(sc.className, 'border text-[10px]')}>{sc.label}</Badge></td>
