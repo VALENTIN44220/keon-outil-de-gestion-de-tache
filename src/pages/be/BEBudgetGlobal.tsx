@@ -136,19 +136,24 @@ export default function BEBudgetGlobal() {
   const { data: allAffaires = [] } = useQuery<BEAffaire[]>({
     queryKey: ['all-be-affaires-budget'],
     queryFn: async () => {
-      const { data } = await sb
+      const { data, error } = await sb
         .from('be_affaires')
         .select('id, be_project_id, code_affaire, libelle, status, date_ouverture, date_cloture')
         .order('code_affaire');
+      // Propager l'erreur au lieu de retomber silencieusement sur une liste vide
+      // (sinon un timeout/echec DB affiche « tout à 0 » sans le signaler).
+      if (error) throw error;
       return data ?? [];
     },
   });
 
   // Fetch all affaire-level KPIs
-  const { data: affaireKpis = [] } = useQuery<BEAffaireBudgetKPI[]>({
+  const { data: affaireKpis = [], isError: affaireKpisError } = useQuery<BEAffaireBudgetKPI[]>({
     queryKey: ['all-be-affaire-kpis-budget'],
     queryFn: async () => {
-      const { data } = await sb.from('v_be_affaire_budget_kpi').select('*');
+      const { data, error } = await sb.from('v_be_affaire_budget_kpi').select('*');
+      // Idem : un echec ne doit pas se traduire par des KPI à 0 silencieux.
+      if (error) throw error;
       return data ?? [];
     },
   });
@@ -431,6 +436,13 @@ export default function BEBudgetGlobal() {
         <Header title="Budget BE" />
         <main className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-6">
           <div className="space-y-4">
+
+            {affaireKpisError && (
+              <div className="rounded-lg border border-amber-400/50 bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-200">
+                Les montants (CA, COGS, RH…) n'ont pas pu être chargés — les valeurs affichées peuvent être incomplètes.
+                Réessayez dans un instant ; si le problème persiste, signalez-le.
+              </div>
+            )}
 
             {/* ── KPI globaux ───────────────────────────────────────────── */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
