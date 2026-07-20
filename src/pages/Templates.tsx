@@ -149,6 +149,19 @@ const EXTERNAL_ENTRIES: DemandType[] = [
     canManage: false,
     raw: null,
   },
+  {
+    id: 'epi-module',
+    source: 'external',
+    forcedCategory: 'logistique',
+    externalRoute: '/epi/dispatch',
+    name: "Demande d'EPI (Module EPI)",
+    description: "Gestion des équipements de protection individuelle via le module dédié — catalogue, demande, dispatch, réception/distribution",
+    visibility: 'public',
+    createdAt: '2026-07-07',
+    stepCount: 0,
+    canManage: false,
+    raw: null,
+  },
 ];
 
 // ════════════════════════════════════════════════════════════════════════════
