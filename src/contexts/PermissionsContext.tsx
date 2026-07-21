@@ -48,6 +48,7 @@ const DEFAULT_PERMISSIONS: EffectivePermissions = {
   can_access_comm: false,      // Déploiement contrôlé : activé par profil via Droits & Accès
   can_access_client: false,    // Déploiement contrôlé : activé par profil via Droits & Accès
   can_access_epi: true,        // EPI : tous peuvent consulter le catalogue et faire des demandes
+  can_access_juridique: true,  // Juridique : tous peuvent déposer une demande et consulter
   can_manage_smq: false,       // Pilote / admin uniquement
   can_manage_logistique: false, // Dispatch logistique / admin uniquement
   can_manage_maintenance: false, // Dispatch maintenance / admin uniquement

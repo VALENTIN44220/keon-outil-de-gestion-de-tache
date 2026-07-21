@@ -63,6 +63,8 @@ import NewLogistiqueRequest from "./pages/logistique/NewLogistiqueRequest";
 import EPIDispatch from "./pages/epi/EPIDispatch";
 import NewEPIRequest from "./pages/epi/NewEPIRequest";
 import EPICatalogue from "./pages/epi/EPICatalogue";
+import JuridiqueDispatch from "./pages/juridique/JuridiqueDispatch";
+import NewJuridiqueRequest from "./pages/juridique/NewJuridiqueRequest";
 import ITDispatch from "./pages/it/ITDispatch";
 import NewITRequest from "./pages/it/NewITRequest";
 import KeonDashboard from "./pages/KeonDashboard";
@@ -181,6 +183,8 @@ const App = () => (
                 { path: "/epi/dispatch", end: true, element: <ProtectedRoute><EPIDispatch /></ProtectedRoute> },
                 { path: "/epi/new", end: true, element: <ProtectedRoute><NewEPIRequest /></ProtectedRoute> },
                 { path: "/epi/catalogue", end: true, element: <ProtectedRoute><EPICatalogue /></ProtectedRoute> },
+                { path: "/juridique/dispatch", end: true, element: <ProtectedRoute><JuridiqueDispatch /></ProtectedRoute> },
+                { path: "/juridique/new", end: true, element: <ProtectedRoute><NewJuridiqueRequest /></ProtectedRoute> },
                 { path: "/rh/dispatch", end: true, element: <ProtectedRoute><RHDispatch /></ProtectedRoute> },
                 { path: "/rh/new", end: true, element: <ProtectedRoute><NewRHRequest /></ProtectedRoute> },
                 { path: "/client/dispatch", end: true, element: <ProtectedRoute><ClientDispatch /></ProtectedRoute> },
@@ -283,6 +287,8 @@ const App = () => (
             <Route path="/epi/dispatch" element={<></>} />
             <Route path="/epi/new" element={<></>} />
             <Route path="/epi/catalogue" element={<></>} />
+            <Route path="/juridique/dispatch" element={<></>} />
+            <Route path="/juridique/new" element={<></>} />
             <Route path="/rh/dispatch" element={<></>} />
             <Route path="/rh/new" element={<></>} />
             <Route path="/client/dispatch" element={<></>} />

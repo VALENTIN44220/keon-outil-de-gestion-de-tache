@@ -5,7 +5,7 @@ import {
   Lightbulb, Monitor, Leaf, Euro, Map as MapIcon, Users, Wallet,
   Package, Truck, ShieldAlert, Settings2, BarChart2,
   UserPlus, AlertTriangle, ListChecks, BookOpen, TrendingUp, Bug,
-  HardHat, ShoppingBag,
+  HardHat, ShoppingBag, Scale,
 } from 'lucide-react';
 import type { ScreenPermissionKey, FeaturePermissionKey } from '@/types/permissions';
 
@@ -115,6 +115,12 @@ export const menuGroups: MenuGroup[] = [
     ],
   },
   {
+    label: 'JURIDIQUE',
+    items: [
+      { id: 'juridique-dispatch', label: 'Demandes juridiques', icon: Scale, path: '/juridique/dispatch', permissionKey: 'can_access_juridique' },
+    ],
+  },
+  {
     label: 'QUALITÉ (SMQ)',
     items: [
       { id: 'smq', label: 'Non-conformités', icon: ShieldAlert, path: '/smq', permissionKey: 'can_access_smq' },
@@ -167,6 +173,7 @@ export const SECTION_COLORS: Record<string, string> = {
   'LOGISTIQUE':      '#06b6d4', // cyan-500
   'EPI':             '#d97706', // amber-600
   'ACHATS':          '#f97316', // orange-500
+  'JURIDIQUE':       '#6366f1', // indigo-500
   'CONFIGURATION':   '#64748b', // slate-500
   'OUTILS':          '#a855f7', // purple-500
   'SUPPORT':         '#ef4444', // red-500
