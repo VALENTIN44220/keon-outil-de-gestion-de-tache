@@ -111,7 +111,6 @@ import {
 // ─── Constantes ──────────────────────────────────────────────────────────────
 
 const BE_PROCESS_TEMPLATE_ID = 'bd75a3b0-c918-4b43-befe-739b83f7461a';
-const BE_WORKER_POSTES = ['ingenieur_etudes', 'projeteur'];
 // Groupe de collaborateurs « SERVICE BUREAUX D'ETUDES » — source de vérité de
 // l'appartenance au BE. Toute personne hors de ce groupe ne doit pas apparaître
 // dans les dropdowns d'affectation, même si son champ be_poste est renseigné.
@@ -1316,12 +1315,14 @@ export function BEDispatchView({ projectId, projectCode }: BEDispatchViewProps) 
 
       const memberIdsArr = Array.from(beMemberIds);
 
-      // 1. Exécutants : ingenieur_etudes + projeteur ET membres du groupe BE
+      // 1. Toute l'équipe BE : l'ensemble des membres actifs du groupe BE
+      //    (BUG-00021 — on ne restreint plus aux postes ingenieur_etudes/projeteur,
+      //    afin que chargés d'affaires, coordinateurs et autres membres du service
+      //    soient assignables).
       const { data: workers } = await supabase
         .from('profiles')
         .select('id, display_name')
         .in('id', memberIdsArr)
-        .in('be_poste', BE_WORKER_POSTES)
         .in('status', ['active', 'external'])
         .order('display_name');
 
@@ -1455,7 +1456,23 @@ export function BEDispatchView({ projectId, projectCode }: BEDispatchViewProps) 
     return st.filter(matchesTaskFilters);
   }, [tasksByRequest, matchesTaskFilters]);
 
-  const totalUnassigned = useMemo(() => tasks.filter(t => !t.assignee_id).length, [tasks]);
+  // Ids des demandes réellement visibles dans la liste (les annulées sont exclues
+  // par la requête `requests`). Sert à ne compter dans les KPI que des tâches
+  // affichables : une tâche rattachée à une demande annulée n'apparaît nulle part
+  // (elle est indexée sous l'id du parent absent), il ne faut donc pas la compter.
+  const visibleRequestIds = useMemo(
+    () => new Set<string>((requests as any[]).map((r) => r.id)),
+    [requests],
+  );
+  const isTaskVisible = useCallback(
+    (t: BETaskRow) => !t.parent_request_id || visibleRequestIds.has(t.parent_request_id),
+    [visibleRequestIds],
+  );
+
+  const totalUnassigned = useMemo(
+    () => tasks.filter(t => !t.assignee_id && isTaskVisible(t)).length,
+    [tasks, isTaskVisible],
+  );
   const totalARelire = useMemo(() => tasks.filter(t => t.be_status === 'a_relire').length, [tasks]);
 
   // ── KPIs (mode global uniquement) ────────────────────────────────────────
@@ -1467,6 +1484,9 @@ export function BEDispatchView({ projectId, projectCode }: BEDispatchViewProps) 
     const activeProjects = new Set<string>();
     for (const t of tasks) {
       if (t.be_status === 'cloturee') continue;
+      // BUG-00020 : ignore les tâches dont la demande parente est annulée/absente
+      // (comptées par le KPI mais jamais listées → « 47 non assigné, liste vide »).
+      if (!isTaskVisible(t)) continue;
       active += 1;
       const projectCode = t.be_project?.code_projet;
       if (projectCode) activeProjects.add(projectCode);
@@ -1475,7 +1495,7 @@ export function BEDispatchView({ projectId, projectCode }: BEDispatchViewProps) 
       if (!t.assignee_id && t.be_status === 'soumise') unassigned += 1;
     }
     return { active, overdue, toValidate, unassigned, activeProjects: activeProjects.size };
-  }, [tasks, todayStr]);
+  }, [tasks, todayStr, isTaskVisible]);
 
   // Listes uniques pour les selects (mode global)
   const projectOptions = useMemo(() => {

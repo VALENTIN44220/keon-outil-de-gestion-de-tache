@@ -313,6 +313,23 @@ export default function RequestDetail() {
     navigate(-1);
   };
 
+  // BUG-00022 : annulation d'UNE prestation (étape) sans toucher au reste de la
+  // demande. La tâche passe en 'cancelled' → elle sort du dispatch BE, des plans
+  // de charge et des KPI. Réversibilité : réactivable via le dispatch si besoin.
+  const handleCancelStep = async () => {
+    if (!task) return;
+    setIsCancelling(true);
+    const { error } = await supabase
+      .from('tasks')
+      .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+      .eq('id', task.id);
+    setIsCancelling(false);
+    setCancelOpen(false);
+    if (error) { toast.error(`Erreur : ${error.message}`); return; }
+    toast.success('Prestation annulée');
+    navigate(-1);
+  };
+
   // ─── Pièces jointes & liens : ajout / suppression ──────────────
   const refreshAttachments = async () => {
     if (!taskId) return;
@@ -437,6 +454,16 @@ export default function RequestDetail() {
 
   // Consulte-t-on une ÉTAPE (tâche enfant) plutôt qu'une demande ?
   const isStep = (task as any).type !== 'request';
+
+  // BUG-00022 : annulation d'une prestation BE isolée (étape avec be_status).
+  // Ouverte à l'admin, au demandeur ou à l'assigné de la prestation.
+  const canCancelStep = isStep
+    && (task as any).be_status != null
+    && !['done', 'validated', 'cancelled'].includes(task.status as string)
+    && (isAdmin
+      || task.requester_id === profile?.id
+      || (task as any).user_id === profile?.id
+      || (task as any).assignee_id === profile?.id);
 
   // Droits d'action sur une étape (progression de statut / réaffectation).
   // Les étapes BE ont leur propre flux (be_status + dispatch) → on n'expose pas
@@ -1101,8 +1128,8 @@ export default function RequestDetail() {
             </Card>
 
             {/* ── Actions ─────────────────────────────────────── */}
-            {/* L'annulation se fait au niveau de la demande, pas d'une étape isolée */}
-            {canCancel && !isStep && (
+            {/* Demande : annulation globale. Étape BE : annulation d'une prestation isolée. */}
+            {((canCancel && !isStep) || canCancelStep) && (
               <div className="flex items-center justify-end gap-2 pt-2">
                 <Button
                   variant="outline"
@@ -1111,7 +1138,7 @@ export default function RequestDetail() {
                   className="gap-2 text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
                 >
                   {isCancelling ? <Loader2 className="h-4 w-4 animate-spin" /> : <Ban className="h-4 w-4" />}
-                  Annuler la demande
+                  {isStep ? 'Annuler cette prestation' : 'Annuler la demande'}
                 </Button>
               </div>
             )}
@@ -1120,20 +1147,24 @@ export default function RequestDetail() {
             <AlertDialog open={cancelOpen} onOpenChange={setCancelOpen}>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Annuler définitivement cette demande ?</AlertDialogTitle>
+                  <AlertDialogTitle>
+                    {isStep ? 'Annuler cette prestation ?' : 'Annuler définitivement cette demande ?'}
+                  </AlertDialogTitle>
                   <AlertDialogDescription>
-                    Toutes les tâches enfant non terminées seront également annulées. Cette action est irréversible.
+                    {isStep
+                      ? "La prestation sera retirée du dispatch BE et des plans de charge. Les autres prestations de la demande ne sont pas affectées."
+                      : 'Toutes les tâches enfant non terminées seront également annulées. Cette action est irréversible.'}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel disabled={isCancelling}>Retour</AlertDialogCancel>
                   <AlertDialogAction
-                    onClick={(e) => { e.preventDefault(); void handleCancel(); }}
+                    onClick={(e) => { e.preventDefault(); void (isStep ? handleCancelStep() : handleCancel()); }}
                     disabled={isCancelling}
                     className="bg-red-600 hover:bg-red-700 text-white"
                   >
                     {isCancelling ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Ban className="h-4 w-4 mr-2" />}
-                    Annuler la demande
+                    {isStep ? 'Annuler la prestation' : 'Annuler la demande'}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>

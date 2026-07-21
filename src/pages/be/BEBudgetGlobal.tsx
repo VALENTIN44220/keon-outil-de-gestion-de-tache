@@ -128,6 +128,12 @@ export default function BEBudgetGlobal() {
   const [selectedActivites, setSelectedActivites] = useState<Set<string>>(new Set());
   const [viewMode, setViewMode] = useState<'projet' | 'affaire'>('projet');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  // BUG-00017 / 00018 : filtres par statut d'affaire et par période (date_ouverture).
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [periodMode, setPeriodMode] = useState<'all' | 'year' | 'after' | 'before' | 'between'>('all');
+  const [periodYear, setPeriodYear] = useState<string>('');
+  const [periodFrom, setPeriodFrom] = useState<string>('');
+  const [periodTo, setPeriodTo] = useState<string>('');
 
   const { data: kpis = [], isLoading: kpisLoading } = useBEProjectsSyntheseKpi();
   const { projects } = useBEProjects();
@@ -193,6 +199,40 @@ export default function BEBudgetGlobal() {
     return act !== null && selectedActivites.has(act);
   };
 
+  // BUG-00017 : filtre par statut d'affaire.
+  const affaireMatchesStatus = (a: BEAffaire): boolean =>
+    statusFilter === 'all' || a.status === statusFilter;
+
+  // BUG-00018 : filtre par période sur la date d'ouverture (année / après / avant / entre).
+  const affaireMatchesPeriod = (a: BEAffaire): boolean => {
+    if (periodMode === 'all') return true;
+    const d = a.date_ouverture ? String(a.date_ouverture).slice(0, 10) : null;
+    if (!d) return false;
+    switch (periodMode) {
+      case 'year':    return !periodYear || d.slice(0, 4) === periodYear;
+      case 'after':   return !periodFrom || d >= periodFrom;
+      case 'before':  return !periodTo || d <= periodTo;
+      case 'between': return (!periodFrom || d >= periodFrom) && (!periodTo || d <= periodTo);
+      default:        return true;
+    }
+  };
+
+  // Prédicat combiné appliqué partout (vues projet + affaire).
+  const affaireMatchesAll = (a: BEAffaire): boolean =>
+    affaireMatchesActivite(a) && affaireMatchesStatus(a) && affaireMatchesPeriod(a);
+
+  // Statuts et années réellement présents dans les données.
+  const availableStatuts = useMemo(() => {
+    const s = new Set<string>();
+    for (const a of allAffaires) if (a.status) s.add(a.status);
+    return [...s].sort();
+  }, [allAffaires]);
+  const availableAnnees = useMemo(() => {
+    const s = new Set<string>();
+    for (const a of allAffaires) if (a.date_ouverture) s.add(String(a.date_ouverture).slice(0, 4));
+    return [...s].sort().reverse();
+  }, [allAffaires]);
+
   const affaireKpisById = useMemo(() => {
     const map = new Map<string, BEAffaireBudgetKPI>();
     for (const k of affaireKpis) map.set(k.be_affaire_id, k);
@@ -205,7 +245,10 @@ export default function BEBudgetGlobal() {
     return m;
   }, [projects]);
 
-  const filterActive = selectedActivites.size > 0;
+  // Un filtre au niveau affaire (activité, statut ou période) est actif → il faut
+  // recalculer les métriques projet sur les seules affaires correspondantes.
+  const affaireFilterActive =
+    selectedActivites.size > 0 || statusFilter !== 'all' || periodMode !== 'all';
 
   // Agrège les KPIs d'une liste d'affaires en métriques de ligne.
   const aggregateAffaires = (list: BEAffaire[]) => {
@@ -233,9 +276,9 @@ export default function BEBudgetGlobal() {
   // (pour ne pas afficher les chiffres des autres activités du projet).
   const projectRows = useMemo(() => {
     let rows = kpis.map((k) => {
-      const m = filterActive
+      const m = affaireFilterActive
         ? aggregateAffaires(
-            (affairesByProject.get(k.be_project_id) ?? []).filter(affaireMatchesActivite),
+            (affairesByProject.get(k.be_project_id) ?? []).filter(affaireMatchesAll),
           )
         : {
             nb_affaires: k.nb_affaires,
@@ -250,8 +293,9 @@ export default function BEBudgetGlobal() {
       return { k, m };
     });
 
-    // Filtre activité : ne garde que les projets ayant ≥1 affaire correspondante.
-    if (filterActive) rows = rows.filter((r) => r.m.nb_affaires > 0);
+    // Filtre affaire (activité / statut / période) : ne garde que les projets
+    // ayant ≥1 affaire correspondante.
+    if (affaireFilterActive) rows = rows.filter((r) => r.m.nb_affaires > 0);
 
     // Filtres rapides (appliqués sur les métriques effectives).
     if (filterMode === 'with_ca') rows = rows.filter((r) => r.m.ca_constate > 0 || r.m.ca_engage > 0);
@@ -277,13 +321,13 @@ export default function BEBudgetGlobal() {
       return sortDir === 'asc' ? a.m[f] - b.m[f] : b.m[f] - a.m[f];
     });
     return rows;
-  }, [kpis, sortKey, sortDir, filterMode, filterActive, selectedActivites, affairesByProject, affaireKpisById]);
+  }, [kpis, sortKey, sortDir, filterMode, affaireFilterActive, selectedActivites, statusFilter, periodMode, periodYear, periodFrom, periodTo, affairesByProject, affaireKpisById]);
 
   // Vue "Par affaire" : liste plate, sans regroupement projet, filtrée par
   // activité + filtre rapide. Permet de voir toutes les affaires d'une activité.
   const affaireRows = useMemo(() => {
     let rows = allAffaires
-      .filter(affaireMatchesActivite)
+      .filter(affaireMatchesAll)
       .map((a) => ({
         a,
         k: affaireKpisById.get(a.id),
@@ -320,7 +364,7 @@ export default function BEBudgetGlobal() {
       return sortDir === 'asc' ? cmp : -cmp;
     });
     return rows;
-  }, [allAffaires, affaireKpisById, projectsById, filterMode, sortKey, sortDir, selectedActivites]);
+  }, [allAffaires, affaireKpisById, projectsById, filterMode, sortKey, sortDir, selectedActivites, statusFilter, periodMode, periodYear, periodFrom, periodTo]);
 
   // Nombre d'éléments affichés selon le mode courant.
   const currentCount = viewMode === 'affaire' ? affaireRows.length : projectRows.length;
@@ -598,6 +642,84 @@ export default function BEBudgetGlobal() {
                   )}
                 </div>
               )}
+
+              {/* Filtre par statut d'affaire (BUG-00017) */}
+              {availableStatuts.length > 0 && (
+                <div className="flex items-center gap-1.5 px-4 pt-2 pb-0 flex-wrap">
+                  <span className="text-[11px] font-medium text-muted-foreground mr-0.5">Statut</span>
+                  {['all', ...availableStatuts].map((st) => {
+                    const active = statusFilter === st;
+                    return (
+                      <button
+                        key={st}
+                        onClick={() => setStatusFilter(st)}
+                        className={cn(
+                          'text-xs px-2.5 py-1 rounded-full border transition-colors capitalize',
+                          active
+                            ? 'bg-primary text-primary-foreground border-primary'
+                            : 'bg-transparent text-muted-foreground border-border hover:border-primary/50 hover:text-foreground',
+                        )}
+                      >
+                        {st === 'all' ? 'Tous' : st.replace(/_/g, ' ')}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Filtre par période sur la date d'ouverture (BUG-00018) */}
+              <div className="flex items-center gap-2 px-4 pt-2 pb-0 flex-wrap">
+                <span className="text-[11px] font-medium text-muted-foreground mr-0.5">Période (ouverture)</span>
+                <select
+                  value={periodMode}
+                  onChange={(e) => setPeriodMode(e.target.value as typeof periodMode)}
+                  className="h-8 text-xs border rounded-md bg-background px-2"
+                >
+                  <option value="all">Toutes</option>
+                  <option value="year">Année</option>
+                  <option value="after">Après le</option>
+                  <option value="before">Avant le</option>
+                  <option value="between">Entre</option>
+                </select>
+                {periodMode === 'year' && (
+                  <select
+                    value={periodYear}
+                    onChange={(e) => setPeriodYear(e.target.value)}
+                    className="h-8 text-xs border rounded-md bg-background px-2"
+                  >
+                    <option value="">— année —</option>
+                    {availableAnnees.map((y) => <option key={y} value={y}>{y}</option>)}
+                  </select>
+                )}
+                {(periodMode === 'after' || periodMode === 'between') && (
+                  <input
+                    type="date"
+                    value={periodFrom}
+                    onChange={(e) => setPeriodFrom(e.target.value)}
+                    className="h-8 text-xs border rounded-md bg-background px-2"
+                  />
+                )}
+                {periodMode === 'between' && <span className="text-xs text-muted-foreground">→</span>}
+                {(periodMode === 'before' || periodMode === 'between') && (
+                  <input
+                    type="date"
+                    value={periodTo}
+                    onChange={(e) => setPeriodTo(e.target.value)}
+                    className="h-8 text-xs border rounded-md bg-background px-2"
+                  />
+                )}
+                {(periodMode !== 'all' || statusFilter !== 'all') && (
+                  <button
+                    onClick={() => {
+                      setPeriodMode('all'); setPeriodYear(''); setPeriodFrom(''); setPeriodTo('');
+                      setStatusFilter('all');
+                    }}
+                    className="text-[11px] text-muted-foreground hover:text-foreground underline underline-offset-2 ml-1"
+                  >
+                    réinitialiser
+                  </button>
+                )}
+              </div>
 
               <CardContent className="p-0 mt-3">
                 {currentCount === 0 ? (
