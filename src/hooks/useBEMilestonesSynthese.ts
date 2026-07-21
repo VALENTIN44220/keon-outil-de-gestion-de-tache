@@ -29,6 +29,7 @@ export interface MilestoneSyntheseRow {
   code_projet: string | null;
   nom_projet: string | null;
   status: string | null;
+  regime_icpe: string | null;
   cells: Record<string, MilestoneCell | undefined>; // type_code -> cell
 }
 
@@ -51,7 +52,7 @@ export function useBEMilestonesSynthese() {
           .eq('is_active', true)
           .order('ordre'),
         sb.from('be_projects')
-          .select('id, code_projet, nom_projet, status, date_os_etude, date_os_travaux, date_cloture_bancaire, date_cloture_juridique')
+          .select('id, code_projet, nom_projet, status, regime_icpe, date_os_etude, date_os_travaux, date_cloture_bancaire, date_cloture_juridique')
           .order('code_projet'),
         sb.from('be_project_milestones')
           .select('be_project_id, type_code, date_prevue, date_reelle'),
@@ -93,6 +94,7 @@ export function useBEMilestonesSynthese() {
           code_projet: p.code_projet,
           nom_projet: p.nom_projet,
           status: p.status,
+          regime_icpe: p.regime_icpe ?? null,
           cells,
         };
       });
