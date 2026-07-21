@@ -47,6 +47,7 @@ export const menuGroups: MenuGroup[] = [
       { id: 'projects', label: 'Projets', icon: FolderOpen, path: '/projects', permissionKey: 'can_access_projects' },
       { id: 'be-dispatch', label: 'Dispatch & Suivi', icon: Users, path: '/be/dispatch', permissionKey: 'can_access_be_dispatch' },
       { id: 'be-planning', label: 'Plan de charge', icon: BarChart2, path: '/be/plan-de-charge', permissionKey: 'can_access_be_dispatch' },
+      { id: 'be-jalons', label: 'Synthèse jalons', icon: CalendarClock, path: '/be/jalons', permissionKey: 'can_access_be_dispatch' },
       { id: 'be-budget', label: 'Budget', icon: Wallet, path: '/be/budget', permissionKey: 'can_access_be_budget' },
     ],
   },
