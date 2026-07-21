@@ -76,8 +76,8 @@ export default function BEMilestonesSynthese() {
 
   // Vues enregistrées.
   const loadPresets = async () => {
-    const { data: pr } = await supabase
-      .from('user_filter_presets' as any)
+    const { data: pr } = await (supabase as any)
+      .from('user_filter_presets')
       .select('id, name, filters, user_id')
       .eq('context_type', CONTEXT)
       .order('name');
@@ -113,7 +113,7 @@ export default function BEMilestonesSynthese() {
   const saveView = async () => {
     if (!newViewName.trim() || !profile?.id) return;
     setSavingView(true);
-    const { error } = await supabase.from('user_filter_presets' as any).insert({
+    const { error } = await (supabase as any).from('user_filter_presets').insert({
       context_type: CONTEXT,
       name: newViewName.trim(),
       filters: { columns: selectedCols },
@@ -132,7 +132,7 @@ export default function BEMilestonesSynthese() {
   };
 
   const deletePreset = async (id: string) => {
-    const { error } = await supabase.from('user_filter_presets' as any).delete().eq('id', id);
+    const { error } = await (supabase as any).from('user_filter_presets').delete().eq('id', id);
     if (error) { toast.error(`Erreur : ${error.message}`); return; }
     void loadPresets();
   };

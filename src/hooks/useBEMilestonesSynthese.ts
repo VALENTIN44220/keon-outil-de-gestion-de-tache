@@ -44,15 +44,16 @@ export function useBEMilestonesSynthese() {
   return useQuery({
     queryKey: ['be-milestones-synthese'],
     queryFn: async () => {
+      const sb = supabase as any;
       const [typesRes, projectsRes, milestonesRes] = await Promise.all([
-        supabase.from('be_milestone_types' as any)
+        sb.from('be_milestone_types')
           .select('code, label, category, ordre')
           .eq('is_active', true)
           .order('ordre'),
-        supabase.from('be_projects')
+        sb.from('be_projects')
           .select('id, code_projet, nom_projet, status, date_os_etude, date_os_travaux, date_cloture_bancaire, date_cloture_juridique')
           .order('code_projet'),
-        supabase.from('be_project_milestones' as any)
+        sb.from('be_project_milestones')
           .select('be_project_id, type_code, date_prevue, date_reelle'),
       ]);
       if (typesRes.error) throw typesRes.error;
