@@ -194,7 +194,20 @@ const SEQUENCED_UNLOCK_STATUSES = new Set([
  *
  * Cas dégénéré (tous parallel_group=NULL) = comportement strictement séquentiel
  * comme avant — rétrocompatible.
+ *
+ * IMPORTANT : le séquençage est cloisonné PAR PRESTATION (préfixe du nom avant
+ * « — »). Des prestations différentes d'une même demande (ex : ICPE Déclaration,
+ * Plan règlementaire, Permis de construire) sont INDÉPENDANTES et ne se bloquent
+ * pas entre elles — même si leurs order_index se chevauchent (10, 20…). Sans ce
+ * cloisonnement, une étape d'une prestation A (ex Plan règlementaire, order 10)
+ * bloquait par accident un groupe parallèle d'une prestation B (ICPE, order 10/11).
  */
+function prestationKey(t: BETaskRow): string {
+  const name = t.sub_process_template?.name ?? '';
+  const idx = name.indexOf(' — ');
+  return idx > 0 ? name.slice(0, idx).trim() : (name || t.id);
+}
+
 function computeBlockedTasks(tasks: BETaskRow[]): Set<string> {
   const blocked = new Set<string>();
 
@@ -208,47 +221,59 @@ function computeBlockedTasks(tasks: BETaskRow[]): Set<string> {
   for (const siblings of byRequest.values()) {
     if (siblings.length <= 1) continue;
 
-    const sorted = [...siblings].sort((a, b) => {
-      const oa = a.sub_process_template?.order_index ?? 9999;
-      const ob = b.sub_process_template?.order_index ?? 9999;
-      if (oa !== ob) return oa - ob;
-      return a.created_at.localeCompare(b.created_at);
-    });
-
-    // Constituer les groupes parallèles consécutifs
-    const groups: BETaskRow[][] = [];
-    let currentGroup: BETaskRow[] = [];
-    let currentKey: string | null = null;
-    for (const t of sorted) {
-      const pg = t.sub_process_template?.parallel_group ?? null;
-      // Clé unique par groupe : si pg=null → solo (clé unique par tâche),
-      //                         si pg non-null → partagée
-      const key = pg === null ? `solo-${t.id}` : `pg-${pg}`;
-      if (key === currentKey && currentGroup.length > 0) {
-        currentGroup.push(t);
-      } else {
-        if (currentGroup.length > 0) groups.push(currentGroup);
-        currentGroup = [t];
-        currentKey = key;
-      }
+    // Cloisonnement par prestation : chaque prestation séquence ses propres étapes.
+    const byPrestation = new Map<string, BETaskRow[]>();
+    for (const t of siblings) {
+      const key = prestationKey(t);
+      if (!byPrestation.has(key)) byPrestation.set(key, []);
+      byPrestation.get(key)!.push(t);
     }
-    if (currentGroup.length > 0) groups.push(currentGroup);
 
-    // Parcourir les groupes : dès qu'un groupe n'est pas entièrement validé,
-    // les tâches des groupes suivants sont bloquées (mais pas celles du groupe en cours)
-    let blocked_from_here = false;
-    for (const group of groups) {
-      if (blocked_from_here) {
-        for (const t of group) blocked.add(t.id);
-        continue;
+    for (const stream of byPrestation.values()) {
+      if (stream.length <= 1) continue;
+
+      const sorted = [...stream].sort((a, b) => {
+        const oa = a.sub_process_template?.order_index ?? 9999;
+        const ob = b.sub_process_template?.order_index ?? 9999;
+        if (oa !== ob) return oa - ob;
+        return a.created_at.localeCompare(b.created_at);
+      });
+
+      // Constituer les groupes parallèles consécutifs
+      const groups: BETaskRow[][] = [];
+      let currentGroup: BETaskRow[] = [];
+      let currentKey: string | null = null;
+      for (const t of sorted) {
+        const pg = t.sub_process_template?.parallel_group ?? null;
+        // Clé unique par groupe : si pg=null → solo (clé unique par tâche),
+        //                         si pg non-null → partagée
+        const key = pg === null ? `solo-${t.id}` : `pg-${pg}`;
+        if (key === currentKey && currentGroup.length > 0) {
+          currentGroup.push(t);
+        } else {
+          if (currentGroup.length > 0) groups.push(currentGroup);
+          currentGroup = [t];
+          currentKey = key;
+        }
       }
-      const allUnlocked = group.every(t =>
-        SEQUENCED_UNLOCK_STATUSES.has(t.be_status ?? ''),
-      );
-      if (!allUnlocked) {
-        // Le groupe en cours n'est pas finalisé : les groupes suivants sont bloqués.
-        // Les tâches DE ce groupe restent actives (parallèles entre elles).
-        blocked_from_here = true;
+      if (currentGroup.length > 0) groups.push(currentGroup);
+
+      // Parcourir les groupes : dès qu'un groupe n'est pas entièrement validé,
+      // les tâches des groupes suivants sont bloquées (mais pas celles du groupe en cours)
+      let blocked_from_here = false;
+      for (const group of groups) {
+        if (blocked_from_here) {
+          for (const t of group) blocked.add(t.id);
+          continue;
+        }
+        const allUnlocked = group.every(t =>
+          SEQUENCED_UNLOCK_STATUSES.has(t.be_status ?? ''),
+        );
+        if (!allUnlocked) {
+          // Le groupe en cours n'est pas finalisé : les groupes suivants sont bloqués.
+          // Les tâches DE ce groupe restent actives (parallèles entre elles).
+          blocked_from_here = true;
+        }
       }
     }
   }
