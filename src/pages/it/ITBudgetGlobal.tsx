@@ -191,7 +191,6 @@ function ExpandedMonths({ line }: { line: ITBudgetLine }) {
   // Montants par mois (initial + révisé) depuis it_budget_line_months (variable/multi)
   const [monthlyInit, setMonthlyInit] = useState<number[]>(Array(12).fill(0));
   const [monthlyRev, setMonthlyRev] = useState<(number | null)[]>(Array(12).fill(null));
-  const [copyOpen, setCopyOpen] = useState(false);
   const reload = useCallback(() => {
     if (!isVariable) {
       setMonthlyInit(Array(12).fill(0));
@@ -442,6 +441,7 @@ function BudgetPageSkeleton() {
 export default function ITBudgetGlobal() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [copyOpen, setCopyOpen] = useState(false);
 
   const { prefs, isLoaded: prefsLoaded, updateColumns, updateFilters } = useITBudgetPreferences();
   const { data: companiesList = [] } = useCompanies();
@@ -1466,7 +1466,10 @@ export default function ITBudgetGlobal() {
           targetAnnee={Number(filters.annee)}
           open={copyOpen}
           onClose={() => setCopyOpen(false)}
-          onDone={reload}
+          onDone={() => {
+            queryClient.invalidateQueries({ queryKey: ['it-budget-global-lines'] });
+            queryClient.invalidateQueries({ queryKey: ['it-budget-global-breakdown'] });
+          }}
         />
 
         {linesLoading || !prefsLoaded ? (
