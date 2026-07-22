@@ -294,10 +294,7 @@ export function ITRHTab({ annee }: Props) {
               <TableRow className="bg-muted/30">
                 <TableHead>Salarié</TableHead>
                 <TableHead>Fonction</TableHead>
-                <TableHead className="text-right">Salaire Q1</TableHead>
-                <TableHead className="text-right">Salaire Q2-Q4</TableHead>
                 <TableHead className="text-right">Bonus annuel</TableHead>
-                <TableHead className="text-right">Charges</TableHead>
                 <TableHead className="text-right">Salaire annuel chargé<br /><span className="text-[10px] font-normal text-muted-foreground">12 mois · 100%</span></TableHead>
                 <TableHead className="text-right">Charges RH annuelle<br /><span className="text-[10px] font-normal text-muted-foreground">mois présents × quotité</span></TableHead>
                 <TableHead className="w-20"></TableHead>
@@ -310,10 +307,7 @@ export function ITRHTab({ annee }: Props) {
                   <TableRow key={r.id}>
                     <TableCell className="font-medium">{r.salarie}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">{r.fonction ?? '—'}</TableCell>
-                    <TableCell className="text-right font-mono text-xs">{fmtEur(Number(r.salaire_q1))}</TableCell>
-                    <TableCell className="text-right font-mono text-xs">{fmtEur(Number(r.salaire_q2_q4))}</TableCell>
                     <TableCell className="text-right font-mono text-xs">{fmtEur(bonus)}</TableCell>
-                    <TableCell className="text-right text-xs">{Math.round(Number(r.charges_pct) * 100)} %</TableCell>
                     <TableCell className="text-right font-mono text-muted-foreground">{fmtEur(Number(r.salaire_annuel_charge) || 0)}</TableCell>
                     <TableCell className="text-right font-mono font-semibold">
                       {fmtEur(Number(r.cout_charge_annuel) || 0)}
