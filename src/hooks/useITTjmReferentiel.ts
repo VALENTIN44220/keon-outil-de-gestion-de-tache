@@ -33,3 +33,18 @@ export function useUpsertITTjmReferentiel() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['it-tjm-referentiel'] }),
   });
 }
+
+export function useDeleteITTjmReferentiel() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (profil_code: string) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase as any)
+        .from('it_tjm_referentiel')
+        .delete()
+        .eq('profil_code', profil_code);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['it-tjm-referentiel'] }),
+  });
+}

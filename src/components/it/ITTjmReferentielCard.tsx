@@ -19,12 +19,16 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Coins, Save, X, Loader2, Pencil, Plus } from 'lucide-react';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Coins, Save, X, Loader2, Pencil, Plus, Trash2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { extractErrorMessage } from '@/lib/extractErrorMessage';
 import { Switch } from '@/components/ui/switch';
-import { useFdrProfils, useAddFdrProfil, useUpdateFdrProfil } from '@/hooks/useFdrSettings';
-import { useITTjmReferentiel, useUpsertITTjmReferentiel } from '@/hooks/useITTjmReferentiel';
+import { useFdrProfils, useAddFdrProfil, useUpdateFdrProfil, useDeleteFdrProfil } from '@/hooks/useFdrSettings';
+import { useITTjmReferentiel, useUpsertITTjmReferentiel, useDeleteITTjmReferentiel } from '@/hooks/useITTjmReferentiel';
 import { useBETjmFonctions } from '@/hooks/useBEAffaireTemps';
 import type { ITTjmReferentiel } from '@/types/itProject';
 
@@ -39,8 +43,12 @@ export function ITTjmReferentielCard() {
   const upsert = useUpsertITTjmReferentiel();
   const addProfil = useAddFdrProfil();
   const updateProfil = useUpdateFdrProfil();
+  const deleteProfil = useDeleteFdrProfil();
+  const deleteTjm = useDeleteITTjmReferentiel();
 
   const [editMap, setEditMap] = useState<Record<string, string>>({});
+  const [nameEdit, setNameEdit] = useState<Record<string, string>>({});
+  const [toDelete, setToDelete] = useState<{ id: string; code: string; nom: string } | null>(null);
   const [newNom, setNewNom] = useState('');
   const [newCode, setNewCode] = useState('');
   const [newTjm, setNewTjm] = useState('');
@@ -121,6 +129,29 @@ export function ITTjmReferentielCard() {
     } catch (e) { saveError(e); }
   };
 
+  const startRename = (code: string, nom: string) => setNameEdit(m => ({ ...m, [code]: nom }));
+  const cancelRename = (code: string) => setNameEdit(m => { const n = { ...m }; delete n[code]; return n; });
+  const saveRename = async (p: (typeof profils)[number]) => {
+    const nom = (nameEdit[p.code] ?? '').trim();
+    if (!nom) { toast({ title: 'Libellé requis', variant: 'destructive' }); return; }
+    try {
+      await updateProfil.mutateAsync({ id: (p as any).id, nom });
+      toast({ title: 'Profil renommé', description: nom });
+      cancelRename(p.code);
+    } catch (e) { saveError(e); }
+  };
+
+  const confirmDelete = async () => {
+    if (!toDelete) return;
+    try {
+      // On retire d'abord le TJM (référentiel IT) puis le profil FDR.
+      await deleteTjm.mutateAsync(toDelete.code);
+      await deleteProfil.mutateAsync(toDelete.id);
+      toast({ title: 'Profil supprimé', description: toDelete.nom });
+      setToDelete(null);
+    } catch (e) { saveError(e); }
+  };
+
   return (
     <Card className="border-border/50">
       <CardHeader className="pb-3">
@@ -190,7 +221,7 @@ export function ITTjmReferentielCard() {
                   <TableHead className="font-mono">Code</TableHead>
                   <TableHead className="w-[260px]">Fonction (référentiel TJM)</TableHead>
                   <TableHead className="text-right w-[170px]">TJM (€/j)</TableHead>
-                  <TableHead className="w-[60px]" />
+                  <TableHead className="w-[90px]" />
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -207,7 +238,35 @@ export function ITTjmReferentielCard() {
                           <span className="text-[11px] text-muted-foreground">{p.actif ? 'Visible' : 'Masqué'}</span>
                         </div>
                       </TableCell>
-                      <TableCell className="text-sm font-medium">{p.nom}</TableCell>
+                      <TableCell className="text-sm font-medium">
+                        {nameEdit[p.code] != null ? (
+                          <div className="flex items-center gap-1">
+                            <Input
+                              value={nameEdit[p.code]}
+                              onChange={(e) => setNameEdit(m => ({ ...m, [p.code]: e.target.value }))}
+                              className="h-7 text-sm w-40"
+                              autoFocus
+                              onKeyDown={(e) => { if (e.key === 'Enter') saveRename(p); if (e.key === 'Escape') cancelRename(p.code); }}
+                            />
+                            <Button size="icon" className="h-7 w-7" onClick={() => saveRename(p)} disabled={updateProfil.isPending}>
+                              {updateProfil.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+                            </Button>
+                            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => cancelRename(p.code)}>
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            className="group inline-flex items-center gap-1.5 text-left hover:text-primary"
+                            title="Renommer le profil"
+                            onClick={() => startRename(p.code, p.nom)}
+                          >
+                            {p.nom}
+                            <Pencil className="h-3 w-3 opacity-0 group-hover:opacity-60" />
+                          </button>
+                        )}
+                      </TableCell>
                       <TableCell className="font-mono text-xs text-muted-foreground">{p.code}</TableCell>
                       <TableCell>
                         <Select
@@ -257,10 +316,18 @@ export function ITTjmReferentielCard() {
                             </Button>
                           </div>
                         ) : (
-                          <Button size="icon" variant="ghost" className="h-7 w-7" title="Saisir un TJM manuel"
-                            onClick={() => startEdit(p.code, tjm)}>
-                            <Pencil className="h-3 w-3" />
-                          </Button>
+                          <div className="flex gap-1">
+                            <Button size="icon" variant="ghost" className="h-7 w-7" title="Saisir un TJM manuel"
+                              onClick={() => startEdit(p.code, tjm)}>
+                              <Pencil className="h-3 w-3" />
+                            </Button>
+                            <Button size="icon" variant="ghost"
+                              className="h-7 w-7 text-destructive hover:text-destructive"
+                              title="Supprimer le profil"
+                              onClick={() => setToDelete({ id: (p as any).id, code: p.code, nom: p.nom })}>
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
                         )}
                       </TableCell>
                     </TableRow>
@@ -274,6 +341,30 @@ export function ITTjmReferentielCard() {
           Astuce : si un taux du référentiel BE change, re-sélectionnez la fonction pour rafraîchir le TJM dérivé.
         </p>
       </CardContent>
+
+      <AlertDialog open={!!toDelete} onOpenChange={(o) => { if (!o) setToDelete(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer le profil « {toDelete?.nom} » ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Le profil et son TJM sont supprimés définitivement du référentiel (et du référentiel
+              capacitaire FDR). Les lignes de budget RH déjà rattachées à ce profil conservent leur
+              coût saisi mais perdront le lien. Pour le retirer temporairement, préférez l'interrupteur
+              <strong> Actif</strong>.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={(e) => { e.preventDefault(); void confirmDelete(); }}
+              disabled={deleteProfil.isPending || deleteTjm.isPending}
+            >
+              {(deleteProfil.isPending || deleteTjm.isPending) ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Supprimer'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

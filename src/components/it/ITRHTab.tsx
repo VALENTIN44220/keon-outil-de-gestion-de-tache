@@ -440,7 +440,17 @@ export function ITRHTab({ annee }: Props) {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label className="text-xs">Charges patronales (ex: 0.4 = 40%)</Label>
-                  <Input type="number" step="0.01" value={editing.charges_pct} onChange={(e) => setEditing({ ...editing, charges_pct: Number(e.target.value) })} />
+                  <Input
+                    type="number" step="0.01"
+                    value={editing.tjm_profil_code ? 0 : editing.charges_pct}
+                    disabled={!!editing.tjm_profil_code}
+                    onChange={(e) => setEditing({ ...editing, charges_pct: Number(e.target.value) })}
+                  />
+                  {editing.tjm_profil_code && (
+                    <p className="text-[10px] text-muted-foreground">
+                      TJM (Lucca) déjà chargé — aucune charge patronale ajoutée.
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs">Quotité IT (ex: 0.3 = 30%)</Label>
