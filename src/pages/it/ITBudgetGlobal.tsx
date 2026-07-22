@@ -11,6 +11,7 @@ import { computeBudgetCanon } from '@/lib/itBudgetCanon';
 import { BudgetLineRapprochementPanel } from '@/components/it/BudgetLineRapprochementPanel';
 import { BudgetLineNdfPanel } from '@/components/it/BudgetLineNdfPanel';
 import { ITRHTab } from '@/components/it/ITRHTab';
+import { ITBudgetCopyYearDialog } from '@/components/it/ITBudgetCopyYearDialog';
 import { SupplierEntriesTab } from '@/components/it/SupplierEntriesTab';
 import { BudgetLineSupplierEntriesPanel } from '@/components/it/BudgetLineSupplierEntriesPanel';
 import { useITBudgetLineSupplierEntriesAgg } from '@/hooks/useSupplierAccountingEntries';
@@ -190,6 +191,7 @@ function ExpandedMonths({ line }: { line: ITBudgetLine }) {
   // Montants par mois (initial + révisé) depuis it_budget_line_months (variable/multi)
   const [monthlyInit, setMonthlyInit] = useState<number[]>(Array(12).fill(0));
   const [monthlyRev, setMonthlyRev] = useState<(number | null)[]>(Array(12).fill(null));
+  const [copyOpen, setCopyOpen] = useState(false);
   const reload = useCallback(() => {
     if (!isVariable) {
       setMonthlyInit(Array(12).fill(0));
@@ -1450,11 +1452,22 @@ export default function ITBudgetGlobal() {
               Réinitialiser
             </Button>
           )}
-          <Button type="button" className="gap-2 ml-auto" onClick={openAddLine}>
+          <Button type="button" variant="outline" className="gap-2 ml-auto" onClick={() => setCopyOpen(true)}>
+            <Plus className="h-4 w-4" />
+            Copier depuis {Number(filters.annee) - 1}
+          </Button>
+          <Button type="button" className="gap-2" onClick={openAddLine}>
             <Plus className="h-4 w-4" />
             + Nouvelle ligne budgétaire
           </Button>
         </div>
+
+        <ITBudgetCopyYearDialog
+          targetAnnee={Number(filters.annee)}
+          open={copyOpen}
+          onClose={() => setCopyOpen(false)}
+          onDone={reload}
+        />
 
         {linesLoading || !prefsLoaded ? (
           <BudgetPageSkeleton />
