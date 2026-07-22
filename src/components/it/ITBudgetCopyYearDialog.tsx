@@ -69,6 +69,7 @@ export function ITBudgetCopyYearDialog({ targetAnnee, open, onClose, onDone }: P
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [copyMonths, setCopyMonths] = useState(false);
   const [skipExisting, setSkipExisting] = useState(true);
+  const [source, setSource] = useState<'budget' | 'reforecast'>('budget');
 
   useEffect(() => { if (open) setSourceAnnee(targetAnnee - 1); }, [open, targetAnnee]);
 
@@ -148,6 +149,12 @@ export function ITBudgetCopyYearDialog({ targetAnnee, open, onClose, onDone }: P
       const buildRow = (l: SrcLine) => {
         const row: any = { exercice: targetAnnee, annee: targetAnnee, statut: 'brouillon' };
         for (const f of STRUCT_FIELDS) row[f] = l[f];
+        // Source Reforecast (F) : reprend les montants révisés comme nouvelle base.
+        if (source === 'reforecast') {
+          row.montant_budget = l.montant_budget_revise ?? l.montant_budget;
+          if (l.budget_type_revise) row.budget_type = l.budget_type_revise;
+          if (l.mois_budget_revise != null) row.mois_budget = l.mois_budget_revise;
+        }
         row.rapprochement_group_id = l.rapprochement_group_id ? (groupMap.get(l.rapprochement_group_id) ?? null) : null;
         row.montant_budget_revise = null;
         row.budget_type_revise = null;
@@ -168,11 +175,12 @@ export function ITBudgetCopyYearDialog({ targetAnnee, open, onClose, onDone }: P
           if (error) throw error;
           insertedCount++;
           const { data: srcMonths } = await sb.from('it_budget_line_months')
-            .select('mois, montant_budget, commentaire').eq('budget_line_id', l.id);
+            .select('mois, montant_budget, montant_budget_revise, commentaire').eq('budget_line_id', l.id);
           if (srcMonths && srcMonths.length > 0) {
             const mrows = srcMonths.map((m: any) => ({
               budget_line_id: newLine.id, mois: m.mois,
-              montant_budget: m.montant_budget, commentaire: m.commentaire,
+              montant_budget: source === 'reforecast' ? (m.montant_budget_revise ?? m.montant_budget) : m.montant_budget,
+              commentaire: m.commentaire,
               // rapprochements réels NON repris (ref commande/facture, NDF, pdf, statut, révisé)
             }));
             const { error: mErr } = await sb.from('it_budget_line_months').insert(mrows);
@@ -232,6 +240,23 @@ export function ITBudgetCopyYearDialog({ targetAnnee, open, onClose, onDone }: P
 
         {/* Options */}
         <div className="flex flex-wrap items-center gap-4 rounded-md border bg-muted/30 px-3 py-2 text-sm">
+          <div className="flex items-center gap-1">
+            <span className="text-muted-foreground">Source :</span>
+            <div className="flex items-center rounded-md border overflow-hidden">
+              <button
+                onClick={() => setSource('budget')}
+                className={`px-2.5 py-1 text-xs ${source === 'budget' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
+              >
+                Budget (B{sourceAnnee})
+              </button>
+              <button
+                onClick={() => setSource('reforecast')}
+                className={`px-2.5 py-1 text-xs border-l ${source === 'reforecast' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
+              >
+                Reforecast (F{sourceAnnee})
+              </button>
+            </div>
+          </div>
           <label className="flex items-center gap-2 cursor-pointer">
             <Checkbox checked={copyMonths} onCheckedChange={(c) => setCopyMonths(c === true)} />
             Copier aussi la ventilation mensuelle

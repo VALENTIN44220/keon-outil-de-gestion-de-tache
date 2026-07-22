@@ -39,6 +39,7 @@ interface RhLine {
   anciennete_q2_q4: number;
   bonus_q2_q4: number;
   charges_pct: number;
+  coefficient: number;
   cout_brut_annuel?: number;
   cout_charge_annuel?: number;
   commentaire: string | null;
@@ -133,7 +134,7 @@ export function ITRHTab({ annee }: Props) {
   const onAdd = () => {
     setEditing({
       id: '', annee, metier: 'IT', fonction: '', salarie: '', profile_id: null,
-      tjm_profil_code: null, moisDebut: 1, moisFin: 12,
+      tjm_profil_code: null, moisDebut: 1, moisFin: 12, coefficient: 1,
       salaire_q1: 0, anciennete_q1: 0, bonus_q1: 0,
       salaire_q2_q4: 0, anciennete_q2_q4: 0, bonus_q2_q4: 0,
       charges_pct: 0.4, commentaire: null,
@@ -192,6 +193,7 @@ export function ITRHTab({ annee }: Props) {
       anciennete_q2_q4: Number(editing.anciennete_q2_q4) || 0,
       bonus_q2_q4: Number(editing.bonus_q2_q4) || 0,
       charges_pct: Number(editing.charges_pct) || 0,
+      coefficient: editing.coefficient === undefined || editing.coefficient === null ? 1 : Number(editing.coefficient),
       commentaire: editing.commentaire,
     };
     const op = editing.id
@@ -216,7 +218,7 @@ export function ITRHTab({ annee }: Props) {
     setCopying(true);
     try {
       const cols = 'metier,fonction,salarie,profile_id,tjm_profil_code,salaire_q1,anciennete_q1,bonus_q1,'
-        + 'salaire_q2_q4,anciennete_q2_q4,bonus_q2_q4,charges_pct,'
+        + 'salaire_q2_q4,anciennete_q2_q4,bonus_q2_q4,charges_pct,coefficient,'
         + 'mois_01,mois_02,mois_03,mois_04,mois_05,mois_06,mois_07,mois_08,mois_09,mois_10,mois_11,mois_12,commentaire';
       const { data, error } = await supabase.from('it_rh_lines').select(cols).eq('annee', src);
       if (error) throw error;
@@ -427,9 +429,16 @@ export function ITRHTab({ annee }: Props) {
                   <Input type="number" step="0.01" value={editing.bonus_q2_q4} onChange={(e) => setEditing({ ...editing, bonus_q2_q4: Number(e.target.value) })} />
                 </div>
               </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Charges patronales (ex: 0.4 = 40%)</Label>
-                <Input type="number" step="0.01" value={editing.charges_pct} onChange={(e) => setEditing({ ...editing, charges_pct: Number(e.target.value) })} />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Charges patronales (ex: 0.4 = 40%)</Label>
+                  <Input type="number" step="0.01" value={editing.charges_pct} onChange={(e) => setEditing({ ...editing, charges_pct: Number(e.target.value) })} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Quotité IT (ex: 0.3 = 30%)</Label>
+                  <Input type="number" min={0} max={1} step="0.05" value={editing.coefficient ?? 1} onChange={(e) => setEditing({ ...editing, coefficient: Number(e.target.value) })} />
+                  <p className="text-[10px] text-muted-foreground">Part du temps sur l'IT (1 = 100%). Ex : Bruno 30% → 0.3.</p>
+                </div>
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Commentaire</Label>
