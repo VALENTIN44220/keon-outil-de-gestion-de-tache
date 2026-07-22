@@ -3,6 +3,7 @@ import { useBEProjectHubCode } from '@/hooks/useBEProjectHubCode';
 import { useQueryClient } from '@tanstack/react-query';
 import { BEProjectHubLayout } from '@/components/be/BEProjectHubLayout';
 import { BEMilestoneTimeline } from '@/components/be/BEMilestoneTimeline';
+import { ProjectMilestonesEditor } from '@/components/be/ProjectMilestonesEditor';
 import {
   useBEProjectByCode, 
   useBEProjectTasks, 
@@ -232,6 +233,22 @@ export default function BEProjectHubOverview() {
             </CardHeader>
             <CardContent>
               <BEMilestoneTimeline beProjectId={project.id} />
+            </CardContent>
+          </Card>
+
+          {/* Dates des jalons — édition (référentiel, synchronisé avec la Synthèse jalons) */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Calendar className="h-5 w-5 text-emerald-600" />
+                Dates des jalons
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ProjectMilestonesEditor
+                projectId={project.id}
+                regimeIcpe={(project as any).regime_icpe ?? null}
+              />
             </CardContent>
           </Card>
 

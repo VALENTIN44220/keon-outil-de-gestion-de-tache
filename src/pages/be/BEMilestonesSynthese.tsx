@@ -6,6 +6,7 @@
  * Chaque projet apparaît même sans jalon (colonnes issues du référentiel).
  */
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { Card } from '@/components/ui/card';
@@ -71,6 +72,10 @@ const fmt = (iso: string) => {
 
 export default function BEMilestonesSynthese() {
   const { profile } = useAuth();
+  const navigate = useNavigate();
+  const openProject = (code: string | null) => {
+    if (code) navigate(`/be/projects/${encodeURIComponent(code)}/overview`);
+  };
   const [activeView, setActiveView] = useState('be-jalons');
   const { data, isLoading, refetch, isFetching } = useBEMilestonesSynthese();
 
@@ -373,8 +378,15 @@ export default function BEMilestonesSynthese() {
                       ) : filteredRows.map(r => (
                         <TableRow key={r.project_id}>
                           <TableCell className="sticky left-0 bg-background z-10 font-medium">
-                            <span className="font-mono text-xs text-muted-foreground">{r.code_projet ?? '—'}</span>
-                            <span className="ml-2">{r.nom_projet ?? ''}</span>
+                            <button
+                              type="button"
+                              onClick={() => openProject(r.code_projet)}
+                              className="text-left hover:underline hover:text-primary"
+                              title="Ouvrir la fiche projet"
+                            >
+                              <span className="font-mono text-xs text-muted-foreground">{r.code_projet ?? '—'}</span>
+                              <span className="ml-2">{r.nom_projet ?? ''}</span>
+                            </button>
                             <RegimeBadge regime={r.regime_icpe} />
                           </TableCell>
                           {visibleTypes.map(t => (
@@ -409,8 +421,15 @@ export default function BEMilestonesSynthese() {
                   return (
                     <Card key={r.project_id} className="border-border/50 p-3">
                       <div className="flex items-center gap-2 mb-3">
-                        <span className="font-mono text-xs text-muted-foreground">{r.code_projet ?? '—'}</span>
-                        <span className="font-medium text-sm">{r.nom_projet ?? ''}</span>
+                        <button
+                          type="button"
+                          onClick={() => openProject(r.code_projet)}
+                          className="flex items-center gap-2 text-left hover:underline hover:text-primary"
+                          title="Ouvrir la fiche projet"
+                        >
+                          <span className="font-mono text-xs text-muted-foreground">{r.code_projet ?? '—'}</span>
+                          <span className="font-medium text-sm">{r.nom_projet ?? ''}</span>
+                        </button>
                         <RegimeBadge regime={r.regime_icpe} />
                       </div>
                       {nodes.length === 0 ? (
