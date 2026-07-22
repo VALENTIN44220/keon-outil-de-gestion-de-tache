@@ -22,9 +22,10 @@ import {
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import {
   Columns, Search, Save, Star, Trash2, RefreshCw, CalendarRange, Loader2,
-  Table as TableIcon, GitCommitHorizontal,
+  Table as TableIcon, GitCommitHorizontal, Upload,
 } from 'lucide-react';
 import type { MilestoneCell, MilestoneType } from '@/hooks/useBEMilestonesSynthese';
+import { ImportJalonsDialog } from '@/components/be/ImportJalonsDialog';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -86,6 +87,7 @@ export default function BEMilestonesSynthese() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [onlyWithData, setOnlyWithData] = useState(true);
   const [viewMode, setViewMode] = useState<'table' | 'timeline'>('table');
+  const [importOpen, setImportOpen] = useState(false);
   const [selectedCols, setSelectedCols] = useState<string[]>([]);
   const [presets, setPresets] = useState<Preset[]>([]);
   const [newViewName, setNewViewName] = useState('');
@@ -342,6 +344,10 @@ export default function BEMilestonesSynthese() {
                   </button>
                 </div>
 
+                <Button variant="outline" size="sm" className="h-9 gap-1.5" onClick={() => setImportOpen(true)}>
+                  <Upload className="h-4 w-4" /> Importer
+                </Button>
+
                 <Button variant="outline" size="sm" className="h-9" onClick={() => void refetch()} disabled={isFetching}>
                   <RefreshCw className={cn('h-4 w-4', isFetching && 'animate-spin')} />
                 </Button>
@@ -467,6 +473,11 @@ export default function BEMilestonesSynthese() {
             )}
           </div>
         </main>
+        <ImportJalonsDialog
+          open={importOpen}
+          onClose={() => setImportOpen(false)}
+          onImported={() => void refetch()}
+        />
       </div>
     </div>
   );
