@@ -28,6 +28,10 @@ interface RhLine {
   fonction: string | null;
   salarie: string;
   profile_id: string | null;
+  tjm_profil_code: string | null;
+  /** Présence (helper d'édition) : mois de début/fin d'activité sur l'année (1-12). */
+  moisDebut?: number;
+  moisFin?: number;
   salaire_q1: number;
   anciennete_q1: number;
   bonus_q1: number;
@@ -47,19 +51,53 @@ interface Props {
 const fmtEur = (n: number) =>
   n.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
 
+/** Jours ouvrés / an pour dériver un coût annuel à partir d'un TJM. */
+const JOURS_OUVRES_AN = 218;
+const MOIS_LABELS = ['jan', 'fév', 'mar', 'avr', 'mai', 'juin', 'juil', 'aoû', 'sep', 'oct', 'nov', 'déc'];
+
 export function ITRHTab({ annee }: Props) {
   const [rows, setRows] = useState<RhLine[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isOpen, setIsOpen] = useState(false);
   const [editing, setEditing] = useState<RhLine | null>(null);
   const [profiles, setProfiles] = useState<{ id: string; display_name: string | null; job_title: string | null }[]>([]);
+  const [tjmProfils, setTjmProfils] = useState<{ profil_code: string; tjm_eur: number; be_fonction: string | null }[]>([]);
 
   useEffect(() => {
     void (async () => {
-      const { data } = await supabase.from('profiles').select('id, display_name, job_title').order('display_name');
-      setProfiles((data ?? []).filter((p: any) => p.display_name) as any);
+      const [pr, tj] = await Promise.all([
+        supabase.from('profiles').select('id, display_name, job_title').order('display_name'),
+        (supabase as any).from('it_tjm_referentiel').select('profil_code, tjm_eur, be_fonction').order('be_fonction'),
+      ]);
+      setProfiles((pr.data ?? []).filter((p: any) => p.display_name) as any);
+      setTjmProfils((tj.data ?? []) as any);
     })();
   }, []);
+
+  const tjmOptions = useMemo(
+    () => tjmProfils.map(t => ({
+      value: t.profil_code,
+      label: `${t.be_fonction ?? t.profil_code} — ${fmtEur(Number(t.tjm_eur))}/j → ${fmtEur(Number(t.tjm_eur) * JOURS_OUVRES_AN)}/an`,
+    })),
+    [tjmProfils],
+  );
+
+  /** Applique un profil TJM : dérive le coût annuel (TJM × jours ouvrés) et pré-remplit. */
+  const applyTjmProfil = (code: string) => {
+    if (!editing) return;
+    const t = tjmProfils.find(x => x.profil_code === code);
+    if (!t) { setEditing({ ...editing, tjm_profil_code: null }); return; }
+    const annuel = Math.round(Number(t.tjm_eur) * JOURS_OUVRES_AN);
+    setEditing({
+      ...editing,
+      tjm_profil_code: code,
+      fonction: editing.fonction || t.be_fonction || '',
+      // Coût dérivé du TJM (déjà chargé) → salaire = coût annuel, charges à 0.
+      salaire_q1: annuel, anciennete_q1: 0, bonus_q1: 0,
+      salaire_q2_q4: annuel, anciennete_q2_q4: 0, bonus_q2_q4: 0,
+      charges_pct: 0,
+    });
+  };
 
   const profileOptions = useMemo(
     () => profiles.map(p => ({ value: p.id, label: p.job_title ? `${p.display_name} — ${p.job_title}` : (p.display_name ?? '') })),
@@ -95,6 +133,7 @@ export function ITRHTab({ annee }: Props) {
   const onAdd = () => {
     setEditing({
       id: '', annee, metier: 'IT', fonction: '', salarie: '', profile_id: null,
+      tjm_profil_code: null, moisDebut: 1, moisFin: 12,
       salaire_q1: 0, anciennete_q1: 0, bonus_q1: 0,
       salaire_q2_q4: 0, anciennete_q2_q4: 0, bonus_q2_q4: 0,
       charges_pct: 0.4, commentaire: null,
@@ -104,7 +143,17 @@ export function ITRHTab({ annee }: Props) {
 
   const onEdit = async (id: string) => {
     const { data } = await supabase.from('it_rh_lines').select('*').eq('id', id).maybeSingle();
-    if (data) { setEditing(data as unknown as RhLine); setIsOpen(true); }
+    if (data) {
+      const d: any = data;
+      const present = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+        .filter(m => Number(d[`mois_${String(m).padStart(2, '0')}`]) > 0);
+      setEditing({
+        ...(d as RhLine),
+        moisDebut: present.length ? present[0] : 1,
+        moisFin: present.length ? present[present.length - 1] : 12,
+      });
+      setIsOpen(true);
+    }
   };
 
   const onDelete = async (id: string) => {
@@ -124,12 +173,18 @@ export function ITRHTab({ annee }: Props) {
       toast({ title: 'Nom du salarié obligatoire', variant: 'destructive' });
       return;
     }
+    const deb = editing.moisDebut ?? 1;
+    const fin = editing.moisFin ?? 12;
+    const moisPayload: Record<string, number> = {};
+    for (let m = 1; m <= 12; m++) moisPayload[`mois_${String(m).padStart(2, '0')}`] = (m >= deb && m <= fin) ? 1 : 0;
     const payload = {
       annee: editing.annee,
       metier: editing.metier,
       fonction: editing.fonction,
       salarie: editing.salarie.trim(),
       profile_id: editing.profile_id,
+      tjm_profil_code: editing.tjm_profil_code,
+      ...moisPayload,
       salaire_q1: Number(editing.salaire_q1) || 0,
       anciennete_q1: Number(editing.anciennete_q1) || 0,
       bonus_q1: Number(editing.bonus_q1) || 0,
@@ -160,7 +215,7 @@ export function ITRHTab({ annee }: Props) {
         !confirm(`L'année ${annee} contient déjà ${rows.length} ligne(s) RH. Copier quand même les salariés de ${src} ?`)) return;
     setCopying(true);
     try {
-      const cols = 'metier,fonction,salarie,profile_id,salaire_q1,anciennete_q1,bonus_q1,'
+      const cols = 'metier,fonction,salarie,profile_id,tjm_profil_code,salaire_q1,anciennete_q1,bonus_q1,'
         + 'salaire_q2_q4,anciennete_q2_q4,bonus_q2_q4,charges_pct,'
         + 'mois_01,mois_02,mois_03,mois_04,mois_05,mois_06,mois_07,mois_08,mois_09,mois_10,mois_11,mois_12,commentaire';
       const { data, error } = await supabase.from('it_rh_lines').select(cols).eq('annee', src);
@@ -276,26 +331,38 @@ export function ITRHTab({ annee }: Props) {
           </DialogHeader>
           {editing && (
             <div className="space-y-3 py-2">
-              <div className="space-y-1">
-                <Label>Profil (référentiel)</Label>
-                <SearchableSelect
-                  value={editing.profile_id ?? ''}
-                  options={profileOptions}
-                  placeholder="Choisir un salarié dans le référentiel…"
-                  searchPlaceholder="Rechercher un salarié…"
-                  onValueChange={(id) => {
-                    const p = profiles.find(x => x.id === id);
-                    setEditing({
-                      ...editing,
-                      profile_id: id || null,
-                      salarie: p?.display_name ?? editing.salarie,
-                      fonction: editing.fonction || p?.job_title || '',
-                    });
-                  }}
-                />
-                <p className="text-[11px] text-muted-foreground">
-                  Sélectionner un profil renseigne le nom et la fonction. Le champ ci-dessous reste modifiable (ex : intérimaire hors référentiel).
-                </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label>Personne (annuaire)</Label>
+                  <SearchableSelect
+                    value={editing.profile_id ?? ''}
+                    options={profileOptions}
+                    placeholder="Choisir une personne…"
+                    searchPlaceholder="Rechercher…"
+                    onValueChange={(id) => {
+                      const p = profiles.find(x => x.id === id);
+                      setEditing({
+                        ...editing,
+                        profile_id: id || null,
+                        salarie: p?.display_name ?? editing.salarie,
+                      });
+                    }}
+                  />
+                  <p className="text-[11px] text-muted-foreground">Qui : renseigne le nom.</p>
+                </div>
+                <div className="space-y-1">
+                  <Label>Profil de salaire (référentiel TJM)</Label>
+                  <SearchableSelect
+                    value={editing.tjm_profil_code ?? ''}
+                    options={tjmOptions}
+                    placeholder="Choisir un profil de salaire…"
+                    searchPlaceholder="Rechercher un profil…"
+                    onValueChange={applyTjmProfil}
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    Coût dérivé = TJM × {JOURS_OUVRES_AN} j/an. Peut différer de la personne (ex : stagiaire projeté salarié).
+                  </p>
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
@@ -307,6 +374,31 @@ export function ITRHTab({ annee }: Props) {
                   <Input value={editing.fonction ?? ''} onChange={(e) => setEditing({ ...editing, fonction: e.target.value })} />
                 </div>
               </div>
+              <div className="grid grid-cols-2 gap-3 items-end">
+                <div className="space-y-1">
+                  <Label className="text-xs">Présent du mois</Label>
+                  <select
+                    value={editing.moisDebut ?? 1}
+                    onChange={(e) => setEditing({ ...editing, moisDebut: Number(e.target.value) })}
+                    className="w-full h-9 border rounded-md bg-background px-2 text-sm"
+                  >
+                    {MOIS_LABELS.map((lbl, i) => <option key={i} value={i + 1}>{lbl}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">… au mois (inclus)</Label>
+                  <select
+                    value={editing.moisFin ?? 12}
+                    onChange={(e) => setEditing({ ...editing, moisFin: Number(e.target.value) })}
+                    className="w-full h-9 border rounded-md bg-background px-2 text-sm"
+                  >
+                    {MOIS_LABELS.map((lbl, i) => <option key={i} value={i + 1}>{lbl}</option>)}
+                  </select>
+                </div>
+              </div>
+              <p className="text-[11px] text-muted-foreground -mt-1">
+                Pour un changement en cours d'année (stagiaire→salarié, départ), créez une ligne par période (ex : jan-aoû, puis sep-déc).
+              </p>
               <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-1">
                   <Label className="text-xs">Salaire Q1 (jan-mar)</Label>
