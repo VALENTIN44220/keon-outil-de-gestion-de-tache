@@ -42,6 +42,8 @@ interface RhLine {
   coefficient: number;
   cout_brut_annuel?: number;
   cout_charge_annuel?: number;
+  /** Salaire chargé sur 12 mois pleins, 100% (sans mois de présence ni coefficient). */
+  salaire_annuel_charge?: number;
   commentaire: string | null;
 }
 
@@ -134,8 +136,8 @@ export function ITRHTab({ annee }: Props) {
     () => rows.reduce((acc, r) => acc + (Number(r.cout_charge_annuel) || 0), 0),
     [rows]
   );
-  const totalBrut = useMemo(
-    () => rows.reduce((acc, r) => acc + (Number(r.cout_brut_annuel) || 0), 0),
+  const totalSalaire12 = useMemo(
+    () => rows.reduce((acc, r) => acc + (Number(r.salaire_annuel_charge) || 0), 0),
     [rows]
   );
 
@@ -262,10 +264,10 @@ export function ITRHTab({ annee }: Props) {
         </div>
         <div className="flex items-center gap-2">
           <Badge variant="outline" className="text-sm">
-            Total brut : <strong className="ml-1">{fmtEur(totalBrut)}</strong>
+            Total salaires chargés (12 mois) : <strong className="ml-1">{fmtEur(totalSalaire12)}</strong>
           </Badge>
           <Badge className="text-sm bg-violet-100 text-violet-800 hover:bg-violet-100">
-            Total chargé : <strong className="ml-1">{fmtEur(totalCharge)}</strong>
+            Total charges RH annuelles : <strong className="ml-1">{fmtEur(totalCharge)}</strong>
           </Badge>
           <Button size="sm" variant="outline" onClick={copyFromPrevYear} disabled={copying}>
             {copying ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Users className="h-4 w-4 mr-1" />}
@@ -296,8 +298,8 @@ export function ITRHTab({ annee }: Props) {
                 <TableHead className="text-right">Salaire Q2-Q4</TableHead>
                 <TableHead className="text-right">Bonus annuel</TableHead>
                 <TableHead className="text-right">Charges</TableHead>
-                <TableHead className="text-right">Brut annuel</TableHead>
-                <TableHead className="text-right">Coût chargé</TableHead>
+                <TableHead className="text-right">Salaire annuel chargé<br /><span className="text-[10px] font-normal text-muted-foreground">12 mois · 100%</span></TableHead>
+                <TableHead className="text-right">Charges RH annuelle<br /><span className="text-[10px] font-normal text-muted-foreground">mois présents × quotité</span></TableHead>
                 <TableHead className="w-20"></TableHead>
               </TableRow>
             </TableHeader>
@@ -312,7 +314,7 @@ export function ITRHTab({ annee }: Props) {
                     <TableCell className="text-right font-mono text-xs">{fmtEur(Number(r.salaire_q2_q4))}</TableCell>
                     <TableCell className="text-right font-mono text-xs">{fmtEur(bonus)}</TableCell>
                     <TableCell className="text-right text-xs">{Math.round(Number(r.charges_pct) * 100)} %</TableCell>
-                    <TableCell className="text-right font-mono">{fmtEur(Number(r.cout_brut_annuel) || 0)}</TableCell>
+                    <TableCell className="text-right font-mono text-muted-foreground">{fmtEur(Number(r.salaire_annuel_charge) || 0)}</TableCell>
                     <TableCell className="text-right font-mono font-semibold">
                       {fmtEur(Number(r.cout_charge_annuel) || 0)}
                     </TableCell>
