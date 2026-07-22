@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import type { MilestoneCell, MilestoneType } from '@/hooks/useBEMilestonesSynthese';
 import { ImportJalonsDialog } from '@/components/be/ImportJalonsDialog';
+import { isApplicable } from '@/lib/beMilestoneRegime';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -43,29 +44,6 @@ const CATEGORY_LABELS: Record<string, string> = {
   reglementaire: 'Réglementaire',
   projet: 'Projet',
 };
-
-// Régime ICPE : un projet suit UN régime ; les jalons ICPE applicables diffèrent.
-const ICPE_TYPES = ['icpe_depot', 'icpe_completude', 'icpe_arrete', 'icpe_purge'];
-const ICPE_BY_REGIME: Record<string, string[]> = {
-  declaration:    ['icpe_depot', 'icpe_completude', 'icpe_purge'],           // pas d'arrêté (récépissé)
-  enregistrement: ['icpe_depot', 'icpe_completude', 'icpe_arrete', 'icpe_purge'],
-  autorisation:   ['icpe_depot', 'icpe_arrete', 'icpe_purge'],               // enquête publique, pas de complétude
-};
-function regimeKey(r: string | null): string | null {
-  if (!r) return null;
-  const s = r.toLowerCase();
-  if (s.startsWith('décl') || s.startsWith('decl')) return 'declaration';
-  if (s.startsWith('enreg')) return 'enregistrement';
-  if (s.startsWith('autor')) return 'autorisation';
-  return null;
-}
-/** Un type de jalon est-il pertinent pour ce projet (selon son régime ICPE) ? */
-function isApplicable(regime: string | null, typeCode: string): boolean {
-  if (!ICPE_TYPES.includes(typeCode)) return true;       // non-ICPE : toujours applicable
-  const key = regimeKey(regime);
-  if (!key) return true;                                  // régime inconnu : tout applicable
-  return ICPE_BY_REGIME[key].includes(typeCode);
-}
 
 const fmt = (iso: string) => {
   try { return format(new Date(iso), 'dd/MM/yy', { locale: fr }); } catch { return iso; }

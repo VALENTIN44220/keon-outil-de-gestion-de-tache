@@ -85,7 +85,7 @@ interface SubStep {
   be_category: 'be' | 'be_reglementaire' | null;
   order_index: number | null;
   /** Groupe parallèle (null = séquentiel) */
-  parallel_group: string | null;
+  parallel_group: number | null;
   /** Manager qui dispatche (cas Cible = rôle générique) */
   dispatch_manager_id: string | null;
   /** Audit : créateur du template (legacy) */

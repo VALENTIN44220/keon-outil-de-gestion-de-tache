@@ -13,29 +13,9 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
+import { isApplicable } from '@/lib/beMilestoneRegime';
 
 interface MType { code: string; label: string; category: string; ordre: number; }
-
-const ICPE_TYPES = ['icpe_depot', 'icpe_completude', 'icpe_arrete', 'icpe_purge'];
-const ICPE_BY_REGIME: Record<string, string[]> = {
-  declaration:    ['icpe_depot', 'icpe_completude', 'icpe_purge'],
-  enregistrement: ['icpe_depot', 'icpe_completude', 'icpe_arrete', 'icpe_purge'],
-  autorisation:   ['icpe_depot', 'icpe_arrete', 'icpe_purge'],
-};
-function regimeKey(r: string | null): string | null {
-  if (!r) return null;
-  const s = r.toLowerCase();
-  if (s.startsWith('déc') || s.startsWith('dec')) return 'declaration';
-  if (s.startsWith('enreg')) return 'enregistrement';
-  if (s.startsWith('autor')) return 'autorisation';
-  return null;
-}
-function isApplicable(regime: string | null, code: string): boolean {
-  if (!ICPE_TYPES.includes(code)) return true;
-  const k = regimeKey(regime);
-  if (!k) return true;
-  return ICPE_BY_REGIME[k].includes(code);
-}
 
 const NATIVE_MAP: Record<string, string> = {
   os_etude: 'date_os_etude',
