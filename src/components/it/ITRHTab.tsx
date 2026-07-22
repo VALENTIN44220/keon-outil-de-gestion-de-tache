@@ -153,6 +153,34 @@ export function ITRHTab({ annee }: Props) {
     }
   };
 
+  const [copying, setCopying] = useState(false);
+  const copyFromPrevYear = async () => {
+    const src = annee - 1;
+    if (rows.length > 0 &&
+        !confirm(`L'année ${annee} contient déjà ${rows.length} ligne(s) RH. Copier quand même les salariés de ${src} ?`)) return;
+    setCopying(true);
+    try {
+      const cols = 'metier,fonction,salarie,profile_id,salaire_q1,anciennete_q1,bonus_q1,'
+        + 'salaire_q2_q4,anciennete_q2_q4,bonus_q2_q4,charges_pct,'
+        + 'mois_01,mois_02,mois_03,mois_04,mois_05,mois_06,mois_07,mois_08,mois_09,mois_10,mois_11,mois_12,commentaire';
+      const { data, error } = await supabase.from('it_rh_lines').select(cols).eq('annee', src);
+      if (error) throw error;
+      if (!data || data.length === 0) {
+        toast({ title: `Aucune ligne RH en ${src}`, description: 'Rien à copier.' });
+        return;
+      }
+      const copies = (data as any[]).map(r => ({ ...r, annee }));
+      const { error: insErr } = await supabase.from('it_rh_lines').insert(copies);
+      if (insErr) throw insErr;
+      toast({ title: `${copies.length} salarié(s) copié(s) depuis ${src}`, description: 'Adaptez les montants si besoin.' });
+      void reload();
+    } catch (e: any) {
+      toast({ title: 'Erreur de copie', description: e.message, variant: 'destructive' });
+    } finally {
+      setCopying(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
@@ -174,6 +202,10 @@ export function ITRHTab({ annee }: Props) {
           <Badge className="text-sm bg-violet-100 text-violet-800 hover:bg-violet-100">
             Total chargé : <strong className="ml-1">{fmtEur(totalCharge)}</strong>
           </Badge>
+          <Button size="sm" variant="outline" onClick={copyFromPrevYear} disabled={copying}>
+            {copying ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Users className="h-4 w-4 mr-1" />}
+            Copier depuis {annee - 1}
+          </Button>
           <Button size="sm" onClick={onAdd}>
             <Plus className="h-4 w-4 mr-1" /> Ajouter un salarié
           </Button>
