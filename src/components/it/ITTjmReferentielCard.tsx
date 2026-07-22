@@ -19,10 +19,10 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Coins, Save, X, Loader2, Pencil } from 'lucide-react';
+import { Coins, Save, X, Loader2, Pencil, Plus } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { extractErrorMessage } from '@/lib/extractErrorMessage';
-import { useFdrProfils } from '@/hooks/useFdrSettings';
+import { useFdrProfils, useAddFdrProfil } from '@/hooks/useFdrSettings';
 import { useITTjmReferentiel, useUpsertITTjmReferentiel } from '@/hooks/useITTjmReferentiel';
 import { useBETjmFonctions } from '@/hooks/useBEAffaireTemps';
 import type { ITTjmReferentiel } from '@/types/itProject';
@@ -36,9 +36,35 @@ export function ITTjmReferentielCard() {
   const { data: tjmList = [], isLoading: tjmLoading } = useITTjmReferentiel();
   const { data: beFonctions = [], isLoading: fonctionsLoading } = useBETjmFonctions();
   const upsert = useUpsertITTjmReferentiel();
+  const addProfil = useAddFdrProfil();
 
   const [editMap, setEditMap] = useState<Record<string, string>>({});
+  const [newNom, setNewNom] = useState('');
+  const [newCode, setNewCode] = useState('');
+  const [newTjm, setNewTjm] = useState('');
   const isLoading = profilsLoading || tjmLoading || fonctionsLoading;
+
+  const slugify = (s: string) =>
+    s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40);
+
+  const createProfil = async () => {
+    const nom = newNom.trim();
+    const code = (newCode.trim() || slugify(nom));
+    const tjm = parseFloat(newTjm);
+    if (!nom) { toast({ title: 'Libellé requis', variant: 'destructive' }); return; }
+    if (!code) { toast({ title: 'Code requis', variant: 'destructive' }); return; }
+    if (isNaN(tjm) || tjm < 0) { toast({ title: 'TJM invalide', variant: 'destructive' }); return; }
+    try {
+      const maxOrdre = Math.max(0, ...profils.map(p => (p as any).ordre ?? 0));
+      await addProfil.mutateAsync({ code, nom, actif: true, ordre: maxOrdre + 1, capacite_j_mois: 18, note: null } as any);
+      await upsert.mutateAsync({ profil_code: code, tjm_eur: tjm, be_fonction: null });
+      toast({ title: 'Profil ajouté', description: `${nom} → ${tjm.toLocaleString('fr-FR')} €/j` });
+      setNewNom(''); setNewCode(''); setNewTjm('');
+    } catch (e) {
+      toast({ title: 'Erreur', description: extractErrorMessage(e), variant: 'destructive' });
+    }
+  };
 
   const rowByCode: Record<string, ITTjmReferentiel> = Object.fromEntries(tjmList.map(t => [t.profil_code, t]));
   const rateByFonction = new Map(beFonctions.map(f => [f.fonction, Number(f.taux_horaire) || 0]));
@@ -96,6 +122,42 @@ export function ITTjmReferentielCard() {
         </p>
       </CardHeader>
       <CardContent className="space-y-3">
+        {/* Ajout d'un profil (rend le référentiel extensible) */}
+        <div className="flex flex-wrap items-end gap-2 rounded-lg border bg-muted/20 p-3">
+          <div className="space-y-1">
+            <label className="text-[11px] font-medium text-muted-foreground">Nouveau profil (libellé)</label>
+            <Input
+              value={newNom}
+              onChange={(e) => setNewNom(e.target.value)}
+              placeholder="Ex : Stagiaire, Ingénieur data…"
+              className="h-8 text-sm w-48"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[11px] font-medium text-muted-foreground">Code</label>
+            <Input
+              value={newCode}
+              onChange={(e) => setNewCode(e.target.value)}
+              placeholder={newNom ? slugify(newNom) : 'auto'}
+              className="h-8 text-sm w-40 font-mono"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[11px] font-medium text-muted-foreground">TJM (€/j)</label>
+            <Input
+              type="number" min={0} step={10}
+              value={newTjm}
+              onChange={(e) => setNewTjm(e.target.value)}
+              placeholder="0"
+              className="h-8 text-sm w-28"
+            />
+          </div>
+          <Button size="sm" className="h-8 gap-1.5" onClick={createProfil} disabled={addProfil.isPending || upsert.isPending || !newNom.trim()}>
+            {(addProfil.isPending) ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+            Ajouter un profil
+          </Button>
+        </div>
+
         {isLoading ? (
           <div className="space-y-2">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-10" />)}</div>
         ) : activeProfils.length === 0 ? (
