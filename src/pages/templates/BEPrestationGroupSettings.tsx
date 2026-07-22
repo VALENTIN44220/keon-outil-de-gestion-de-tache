@@ -67,6 +67,8 @@ interface StepDraft {
   // ── Jalon timeline ──
   isMilestone: boolean;
   milestoneLabel: string;
+  /** Type de jalon du référentiel (be_milestone_types.code) — pilote la date auto. */
+  milestoneTypeCode: string;
   autoMilestoneDelayDays: number | null;
   autoMilestoneLabel: string;
   // ── Documents obligatoires ──
@@ -152,6 +154,7 @@ export default function BEPrestationGroupSettings() {
   const [isSaving, setIsSaving] = useState(false);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [requestStates, setRequestStates] = useState<RequestState[]>([]);
+  const [milestoneTypes, setMilestoneTypes] = useState<{ code: string; label: string; category: string }[]>([]);
   const [beCategory, setBeCategory] = useState<'be' | 'be_reglementaire'>('be');
   const [steps, setSteps] = useState<StepDraft[]>([]);
 
@@ -166,7 +169,7 @@ export default function BEPrestationGroupSettings() {
     async function load() {
       setIsLoading(true);
       try {
-        const [{ data: allData, error: spErr }, { data: profData }, { data: stateData }] = await Promise.all([
+        const [{ data: allData, error: spErr }, { data: profData }, { data: stateData }, { data: typeData }] = await Promise.all([
           supabase
             .from('sub_process_templates')
             .select('*')
@@ -178,11 +181,17 @@ export default function BEPrestationGroupSettings() {
             .select('code, label, state_category')
             .eq('process_template_id', BE_PROCESS_ID)
             .order('order_index', { ascending: true }),
+          (supabase as any)
+            .from('be_milestone_types')
+            .select('code, label, category')
+            .eq('is_active', true)
+            .order('ordre'),
         ]);
 
         if (spErr) throw spErr;
         setProfiles((profData ?? []) as Profile[]);
         setRequestStates((stateData ?? []) as RequestState[]);
+        setMilestoneTypes((typeData ?? []) as { code: string; label: string; category: string }[]);
 
         // Filtrage côté client pour éviter les problèmes d'encodage PostgREST
         const prefix = `${prestationName} — `;
@@ -212,6 +221,7 @@ export default function BEPrestationGroupSettings() {
           // Jalon
           isMilestone: sp.is_milestone ?? false,
           milestoneLabel: sp.milestone_label ?? '',
+          milestoneTypeCode: (sp as any).milestone_type_code ?? '',
           autoMilestoneDelayDays: sp.auto_milestone_delay_days ?? null,
           autoMilestoneLabel: sp.auto_milestone_label ?? '',
           // Docs obligatoires
@@ -280,6 +290,7 @@ export default function BEPrestationGroupSettings() {
       delayAfterPreviousDays: 0,
       isMilestone: false,
       milestoneLabel: '',
+      milestoneTypeCode: '',
       autoMilestoneDelayDays: null,
       autoMilestoneLabel: '',
       requiredDocsCount: 0,
@@ -339,6 +350,7 @@ export default function BEPrestationGroupSettings() {
           // ── Jalon timeline ──
           is_milestone: s.isMilestone,
           milestone_label: s.isMilestone ? (s.milestoneLabel || null) : null,
+          milestone_type_code: s.isMilestone ? (s.milestoneTypeCode || null) : null,
           auto_milestone_delay_days: s.autoMilestoneDelayDays,
           auto_milestone_label: s.autoMilestoneLabel || null,
           // ── Documents obligatoires ──
@@ -789,13 +801,33 @@ export default function BEPrestationGroupSettings() {
                   {step.isMilestone && (
                     <div className="grid grid-cols-2 gap-4 mt-3">
                       <div className="col-span-2">
-                        <Label className="text-xs">Libellé du jalon (optionnel)</Label>
-                        <Input
-                          value={step.milestoneLabel}
-                          onChange={e => updateStep(step.tempId, { milestoneLabel: e.target.value })}
-                          placeholder="Ex: Dépôt du dossier"
-                          className="h-8 text-sm mt-1"
-                        />
+                        <Label className="text-xs">Type de jalon (référentiel)</Label>
+                        <Select
+                          value={step.milestoneTypeCode || '__none__'}
+                          onValueChange={v => updateStep(step.tempId, { milestoneTypeCode: v === '__none__' ? '' : v })}
+                        >
+                          <SelectTrigger className="h-8 text-sm mt-1">
+                            <SelectValue placeholder="Choisir le type de jalon…" />
+                          </SelectTrigger>
+                          <SelectContent className="max-h-72">
+                            <SelectItem value="__none__">— Aucun (jalon générique) —</SelectItem>
+                            {['reglementaire', 'projet'].map(cat => {
+                              const list = milestoneTypes.filter(t => t.category === cat);
+                              if (list.length === 0) return null;
+                              return (
+                                <div key={cat}>
+                                  <p className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase">
+                                    {cat === 'reglementaire' ? 'Réglementaire' : 'Projet'}
+                                  </p>
+                                  {list.map(t => <SelectItem key={t.code} value={t.code}>{t.label}</SelectItem>)}
+                                </div>
+                              );
+                            })}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-[10px] text-muted-foreground mt-1">
+                          À la validation de l'étape, la date réelle du jalon de ce type est posée automatiquement sur le projet.
+                        </p>
                       </div>
                       <div>
                         <Label className="text-xs flex items-center gap-1">
