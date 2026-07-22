@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/table';
 import { toast } from '@/hooks/use-toast';
 import { Plus, Edit2, Trash2, Loader2, Users } from 'lucide-react';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 
 interface RhLine {
   id: string;
@@ -26,6 +27,7 @@ interface RhLine {
   metier: string | null;
   fonction: string | null;
   salarie: string;
+  profile_id: string | null;
   salaire_q1: number;
   anciennete_q1: number;
   bonus_q1: number;
@@ -50,6 +52,19 @@ export function ITRHTab({ annee }: Props) {
   const [isLoading, setIsLoading] = useState(true);
   const [isOpen, setIsOpen] = useState(false);
   const [editing, setEditing] = useState<RhLine | null>(null);
+  const [profiles, setProfiles] = useState<{ id: string; display_name: string | null; job_title: string | null }[]>([]);
+
+  useEffect(() => {
+    void (async () => {
+      const { data } = await supabase.from('profiles').select('id, display_name, job_title').order('display_name');
+      setProfiles((data ?? []).filter((p: any) => p.display_name) as any);
+    })();
+  }, []);
+
+  const profileOptions = useMemo(
+    () => profiles.map(p => ({ value: p.id, label: p.job_title ? `${p.display_name} — ${p.job_title}` : (p.display_name ?? '') })),
+    [profiles],
+  );
 
   const reload = async () => {
     setIsLoading(true);
@@ -79,7 +94,7 @@ export function ITRHTab({ annee }: Props) {
 
   const onAdd = () => {
     setEditing({
-      id: '', annee, metier: 'IT', fonction: '', salarie: '',
+      id: '', annee, metier: 'IT', fonction: '', salarie: '', profile_id: null,
       salaire_q1: 0, anciennete_q1: 0, bonus_q1: 0,
       salaire_q2_q4: 0, anciennete_q2_q4: 0, bonus_q2_q4: 0,
       charges_pct: 0.4, commentaire: null,
@@ -114,6 +129,7 @@ export function ITRHTab({ annee }: Props) {
       metier: editing.metier,
       fonction: editing.fonction,
       salarie: editing.salarie.trim(),
+      profile_id: editing.profile_id,
       salaire_q1: Number(editing.salaire_q1) || 0,
       anciennete_q1: Number(editing.anciennete_q1) || 0,
       bonus_q1: Number(editing.bonus_q1) || 0,
@@ -228,6 +244,27 @@ export function ITRHTab({ annee }: Props) {
           </DialogHeader>
           {editing && (
             <div className="space-y-3 py-2">
+              <div className="space-y-1">
+                <Label>Profil (référentiel)</Label>
+                <SearchableSelect
+                  value={editing.profile_id ?? ''}
+                  options={profileOptions}
+                  placeholder="Choisir un salarié dans le référentiel…"
+                  searchPlaceholder="Rechercher un salarié…"
+                  onValueChange={(id) => {
+                    const p = profiles.find(x => x.id === id);
+                    setEditing({
+                      ...editing,
+                      profile_id: id || null,
+                      salarie: p?.display_name ?? editing.salarie,
+                      fonction: editing.fonction || p?.job_title || '',
+                    });
+                  }}
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Sélectionner un profil renseigne le nom et la fonction. Le champ ci-dessous reste modifiable (ex : intérimaire hors référentiel).
+                </p>
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label>Salarié *</Label>

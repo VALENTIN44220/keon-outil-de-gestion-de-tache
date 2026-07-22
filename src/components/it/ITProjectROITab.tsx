@@ -397,24 +397,26 @@ export function ITProjectROITab({ project, loads }: Props) {
                       {loads.map(l => {
                         const code = l.profil?.code ?? '';
                         const tjm = tjmMap[code] ?? 0;
-                        const duree = project.delai_projete_mois ?? 0;
-                        const jTotal = l.j_mois * duree;
+                        // Tâche permanente = coût annuel (× 12 mois) ; sinon durée totale du projet.
+                        const isPermanent = project.statut_portefeuille === 'Tâche permanente';
+                        const monthsFactor = isPermanent ? 12 : (project.delai_projete_mois ?? 0);
+                        const jTotal = l.j_mois * monthsFactor;
                         const cout = jTotal * tjm;
                         return (
                           <TableRow key={l.id}>
                             <TableCell className="text-sm">{l.profil?.nom ?? code}</TableCell>
                             <TableCell className="text-right tabular-nums text-sm">{l.j_mois} j</TableCell>
                             <TableCell className="text-right tabular-nums text-sm text-muted-foreground">
-                              {duree ? `× ${duree} mois` : '—'}
+                              {monthsFactor ? `× ${monthsFactor} mois${isPermanent ? ' (annuel)' : ''}` : '—'}
                             </TableCell>
                             <TableCell className="text-right tabular-nums text-sm font-medium">
-                              {duree ? jours(jTotal) : '—'}
+                              {monthsFactor ? jours(jTotal) : '—'}
                             </TableCell>
                             <TableCell className={cn('text-right tabular-nums text-sm', tjm === 0 && 'text-amber-500')}>
                               {tjm > 0 ? `${eur(tjm)}/j` : '—'}
                             </TableCell>
                             <TableCell className="text-right tabular-nums text-sm font-semibold">
-                              {tjm > 0 && duree > 0 ? eur(cout) : '—'}
+                              {tjm > 0 && monthsFactor > 0 ? eur(cout) : '—'}
                             </TableCell>
                           </TableRow>
                         );

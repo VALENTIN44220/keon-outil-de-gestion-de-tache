@@ -6,7 +6,7 @@ import type { ITProject, ITProjectRHHorsIT, ITRoiCalc } from '@/types/itProject'
 import type { ITProjectLoad } from '@/types/fdr';
 
 export function computeRoi(
-  project: Pick<ITProject, 'budget_externe_eur' | 'delai_projete_mois'>,
+  project: Pick<ITProject, 'budget_externe_eur' | 'delai_projete_mois' | 'statut_portefeuille'>,
   loads: ITProjectLoad[],
   tjmMap: Record<string, number>,
   rhHorsIT: ITProjectRHHorsIT[],
@@ -14,18 +14,22 @@ export function computeRoi(
   // COGS = budget externe (coût si ST)
   const cogs_eur = project.budget_externe_eur ?? 0;
 
-  // RH IT BUILD : j/mois × durée build × TJM
+  // Tâche permanente = charge RÉCURRENTE → coût ANNUEL (j/mois × 12), et non le
+  // cumul sur toute la durée du projet (ex : 4,5 j/mois × 50 mois = 225 j serait faux).
+  const isPermanent = project.statut_portefeuille === 'Tâche permanente';
+  // RH IT : projet ponctuel = j/mois × durée build ; permanent = j/mois × 12 (annuel).
   const duree = project.delai_projete_mois ?? 0;
+  const monthsFactor = isPermanent ? 12 : duree;
   let rh_it_eur = 0;
   let total_j_build = 0;
   for (const load of loads) {
     const code = load.profil?.code ?? '';
     const tjm = tjmMap[code] ?? 0;
-    // profil détaillé : Σ des mois saisis ; sinon j/mois × durée build
-    const isDetailed = !!load.months && Object.keys(load.months).length > 0;
+    // profil détaillé (mois saisis) : Σ des mois — sauf permanent où l'on veut l'annuel.
+    const isDetailed = !isPermanent && !!load.months && Object.keys(load.months).length > 0;
     const jBuild = isDetailed
       ? Object.values(load.months!).reduce((s, v) => s + (Number(v) || 0), 0)
-      : load.j_mois * duree;
+      : load.j_mois * monthsFactor;
     total_j_build += jBuild;
     rh_it_eur += jBuild * tjm;
   }

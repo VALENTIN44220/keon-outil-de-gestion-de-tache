@@ -37,12 +37,15 @@ function computeRoi(
 ): ITRoiCalc {
   const cogs_eur = project.budget_externe_eur ?? 0;
   const duree = project.delai_projete_mois ?? 0;
+  // Tâche permanente = charge récurrente → coût ANNUEL (j/mois × 12), pas le cumul
+  // sur toute la durée du projet.
+  const monthsFactor = project.statut_portefeuille === 'Tâche permanente' ? 12 : duree;
   let rh_it_eur = 0;
   let total_j_build = 0;
   for (const load of loads) {
     const code = (load as any).profil?.code ?? '';
     const tjm = tjmMap[code] ?? 0;
-    const jBuild = load.j_mois * duree;
+    const jBuild = load.j_mois * monthsFactor;
     total_j_build += jBuild;
     rh_it_eur += jBuild * tjm;
   }

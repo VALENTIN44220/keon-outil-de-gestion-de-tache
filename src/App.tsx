@@ -13,6 +13,7 @@ import { AuthGate } from "@/components/auth/AuthGate";
 import { ForcePasswordChange } from "@/components/auth/ForcePasswordChange";
 import { PersistentRoutes } from "@/components/routing/PersistentRoutes";
 import { ITProjectsAccessGate } from "@/components/it/ITProjectsAccessGate";
+import { ITBudgetAccessGate } from "@/components/it/ITBudgetAccessGate";
 import { useBEAutoSync } from "@/hooks/useBEAutoSync";
 
 /** Composant invisible qui déclenche la sync BE au démarrage de l'app. */
@@ -227,7 +228,7 @@ const App = () => (
                 // IT project hub (écran dédié + voir projet IT)
                 { path: "/it/projects", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITProjects /></ITProjectsAccessGate></ProtectedRoute> },
                 { path: "/it/projects/new", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITProjectCreate /></ITProjectsAccessGate></ProtectedRoute> },
-                { path: "/it/budget", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITBudgetGlobal /></ITProjectsAccessGate></ProtectedRoute> },
+                { path: "/it/budget", end: true, element: <ProtectedRoute><ITBudgetAccessGate><ITBudgetGlobal /></ITBudgetAccessGate></ProtectedRoute> },
                 { path: "/it/cartographie", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITCartographie /></ITProjectsAccessGate></ProtectedRoute> },
                 { path: "/it/admin/fdr", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITAdminFDR /></ITProjectsAccessGate></ProtectedRoute> },
                 { path: "/it/plan-de-charge", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITPlanning /></ITProjectsAccessGate></ProtectedRoute> },
