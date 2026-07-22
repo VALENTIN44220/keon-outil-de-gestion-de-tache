@@ -63,24 +63,32 @@ export function ITRHTab({ annee }: Props) {
   const [editing, setEditing] = useState<RhLine | null>(null);
   const [profiles, setProfiles] = useState<{ id: string; display_name: string | null; job_title: string | null }[]>([]);
   const [tjmProfils, setTjmProfils] = useState<{ profil_code: string; tjm_eur: number; be_fonction: string | null }[]>([]);
+  // Codes des profils FDR désactivés → on les masque dans le menu « Profil de salaire ».
+  const [inactiveCodes, setInactiveCodes] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     void (async () => {
-      const [pr, tj] = await Promise.all([
+      const [pr, tj, fp] = await Promise.all([
         supabase.from('profiles').select('id, display_name, job_title').order('display_name'),
         (supabase as any).from('it_tjm_referentiel').select('profil_code, tjm_eur, be_fonction').order('be_fonction'),
+        (supabase as any).from('fdr_profils').select('code, actif'),
       ]);
       setProfiles((pr.data ?? []).filter((p: any) => p.display_name) as any);
       setTjmProfils((tj.data ?? []) as any);
+      setInactiveCodes(new Set((fp.data ?? []).filter((p: any) => p.actif === false).map((p: any) => p.code)));
     })();
   }, []);
 
   const tjmOptions = useMemo(
-    () => tjmProfils.map(t => ({
-      value: t.profil_code,
-      label: `${t.be_fonction ?? t.profil_code} — ${fmtEur(Number(t.tjm_eur))}/j → ${fmtEur(Number(t.tjm_eur) * JOURS_OUVRES_AN)}/an`,
-    })),
-    [tjmProfils],
+    () => tjmProfils
+      // On garde un code désactivé s'il est déjà sélectionné sur la ligne éditée
+      // (sinon la valeur courante disparaîtrait du menu).
+      .filter(t => !inactiveCodes.has(t.profil_code) || editing?.tjm_profil_code === t.profil_code)
+      .map(t => ({
+        value: t.profil_code,
+        label: `${t.be_fonction ?? t.profil_code} — ${fmtEur(Number(t.tjm_eur))}/j → ${fmtEur(Number(t.tjm_eur) * JOURS_OUVRES_AN)}/an`,
+      })),
+    [tjmProfils, inactiveCodes, editing?.tjm_profil_code],
   );
 
   /** Applique un profil TJM : dérive le coût annuel (TJM × jours ouvrés) et pré-remplit. */

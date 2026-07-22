@@ -22,7 +22,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Coins, Save, X, Loader2, Pencil, Plus } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { extractErrorMessage } from '@/lib/extractErrorMessage';
-import { useFdrProfils, useAddFdrProfil } from '@/hooks/useFdrSettings';
+import { Switch } from '@/components/ui/switch';
+import { useFdrProfils, useAddFdrProfil, useUpdateFdrProfil } from '@/hooks/useFdrSettings';
 import { useITTjmReferentiel, useUpsertITTjmReferentiel } from '@/hooks/useITTjmReferentiel';
 import { useBETjmFonctions } from '@/hooks/useBEAffaireTemps';
 import type { ITTjmReferentiel } from '@/types/itProject';
@@ -37,6 +38,7 @@ export function ITTjmReferentielCard() {
   const { data: beFonctions = [], isLoading: fonctionsLoading } = useBETjmFonctions();
   const upsert = useUpsertITTjmReferentiel();
   const addProfil = useAddFdrProfil();
+  const updateProfil = useUpdateFdrProfil();
 
   const [editMap, setEditMap] = useState<Record<string, string>>({});
   const [newNom, setNewNom] = useState('');
@@ -105,7 +107,19 @@ export function ITTjmReferentielCard() {
     } catch (e) { saveError(e); }
   };
 
-  const activeProfils = profils.filter(p => p.actif);
+  // On affiche TOUS les profils (actifs + inactifs) : l'interrupteur « Actif »
+  // pilote ceux qui apparaissent dans le menu « Profil de salaire » du budget RH.
+  const sortedProfils = [...profils].sort(
+    (a, b) => Number(b.actif) - Number(a.actif) || ((a as any).ordre ?? 0) - ((b as any).ordre ?? 0),
+  );
+
+  const toggleActif = async (p: (typeof profils)[number]) => {
+    try {
+      await updateProfil.mutateAsync({ id: (p as any).id, actif: !p.actif });
+      toast({ title: p.actif ? 'Profil masqué' : 'Profil activé',
+        description: p.actif ? `${p.nom} n'apparaîtra plus dans le budget RH.` : `${p.nom} est disponible dans le budget RH.` });
+    } catch (e) { saveError(e); }
+  };
 
   return (
     <Card className="border-border/50">
@@ -119,6 +133,10 @@ export function ITTjmReferentielCard() {
           TJM (Taux Journalier Moyen) par profil FDR, utilisé pour valoriser la charge build IT dans le calcul ROI.
           Choisissez une <strong>fonction du référentiel TJM</strong> pour dériver le TJM automatiquement
           (taux horaire × {HEURES_PAR_JOUR} h), ou saisissez un montant manuel. Accès admin uniquement.
+          <br />
+          L'interrupteur <strong>Actif</strong> pilote les profils proposés dans le menu
+          « Profil de salaire » du budget RH : désactivez un profil pour le retirer de la liste
+          (sans supprimer son TJM).
         </p>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -160,13 +178,14 @@ export function ITTjmReferentielCard() {
 
         {isLoading ? (
           <div className="space-y-2">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-10" />)}</div>
-        ) : activeProfils.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Aucun profil actif — créer des profils dans les Paramètres FDR.</p>
+        ) : sortedProfils.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Aucun profil — créez-en un ci-dessus.</p>
         ) : (
           <div className="rounded-lg border overflow-hidden">
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/30 hover:bg-muted/30">
+                  <TableHead className="w-[130px]">Actif (budget RH)</TableHead>
                   <TableHead>Profil</TableHead>
                   <TableHead className="font-mono">Code</TableHead>
                   <TableHead className="w-[260px]">Fonction (référentiel TJM)</TableHead>
@@ -175,13 +194,19 @@ export function ITTjmReferentielCard() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {activeProfils.map(p => {
+                {sortedProfils.map(p => {
                   const row = rowByCode[p.code];
                   const linked = !!row?.be_fonction;
                   const tjm = effectiveTjm(row);
                   const editing = editMap[p.code] != null;
                   return (
-                    <TableRow key={p.code} className={editing ? 'bg-amber-500/5' : ''}>
+                    <TableRow key={p.code} className={editing ? 'bg-amber-500/5' : (!p.actif ? 'opacity-55' : '')}>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Switch checked={p.actif} onCheckedChange={() => toggleActif(p)} disabled={updateProfil.isPending} />
+                          <span className="text-[11px] text-muted-foreground">{p.actif ? 'Visible' : 'Masqué'}</span>
+                        </div>
+                      </TableCell>
                       <TableCell className="text-sm font-medium">{p.nom}</TableCell>
                       <TableCell className="font-mono text-xs text-muted-foreground">{p.code}</TableCell>
                       <TableCell>
