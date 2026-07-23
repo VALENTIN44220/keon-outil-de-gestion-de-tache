@@ -544,10 +544,11 @@ export default function ITBudgetGlobal() {
   const rhToInclude = (!filters.categorie && !filters.type_depense) ? rhChargeTotal : 0;
 
   // KPI canoniques exposés par le hook — alias rétro-compat pour les consommateurs locaux.
-  // Les globaux (cards + total bilan) incluent le coût RH ; les breakdowns par
-  // ligne/groupe restent sur les seules lignes budgétaires.
-  const engageGlobal   = kpis.engage + rhToInclude;
-  const constateGlobal = kpis.constate + rhToInclude;
+  // Le coût RH alimente le BUDGET (initial/révisé) et le FORECAST (dépense attendue),
+  // mais PAS l'engagé/constaté (dépense réelle Divalto). Sinon une année future
+  // afficherait un constaté = RH et un taux de conso non nul à tort.
+  const engageGlobal   = kpis.engage;
+  const constateGlobal = kpis.constate;
 
   // Libellés colonnes budget/reforecast dérivés de l'année affichée (B27/F27…).
   const budYY = yy2(filters.annee);
@@ -1078,7 +1079,9 @@ export default function ITBudgetGlobal() {
    * statut=engage_total). On garde le max() pour couvrir le cas marginal où une
    * facture arrive sans commande Divalto associée (constate > engage).
    */
-  const forecastCorrige = Math.max(engageGlobal, constateGlobal) + manuel_prevu;
+  // Forecast = dépense réelle max(engagé, constaté) + dépenses manuelles + RH
+  // (le RH est une dépense attendue même s'il n'est pas « constaté » via Divalto).
+  const forecastCorrige = Math.max(engageGlobal, constateGlobal) + manuel_prevu + rhToInclude;
   const ecartCorrige = forecastCorrige - budgetReviseGlobal;
   const depassementCorrige = Math.max(ecartCorrige, 0);
   const economieCorrigee = Math.max(-ecartCorrige, 0);
@@ -1582,7 +1585,7 @@ export default function ITBudgetGlobal() {
                 </div>
                 <p className="mt-2 text-xl font-bold tabular-nums text-amber-900 dark:text-amber-100">{eur(forecastCorrige)}</p>
                 <p className="mt-1 text-[10px] text-muted-foreground leading-tight">
-                  max(engagé, constaté) + dépenses manuelles
+                  max(engagé, constaté) + dépenses manuelles{rhToInclude > 0 ? ' + RH' : ''}
                 </p>
               </div>
               {depassementCard}
@@ -2091,6 +2094,12 @@ export default function ITBudgetGlobal() {
                           <TableCell className="font-medium">Dépenses manuelles prévues</TableCell>
                           <TableCell className="text-right tabular-nums">{eur(manuel_prevu)}</TableCell>
                         </TableRow>
+                        {rhToInclude > 0 && (
+                          <TableRow>
+                            <TableCell className="font-medium">Coût RH (dépense attendue)</TableCell>
+                            <TableCell className="text-right tabular-nums">{eur(rhToInclude)}</TableCell>
+                          </TableRow>
+                        )}
                         <TableRow>
                           <TableCell className="font-medium">Engagé (commandes Divalto)</TableCell>
                           <TableCell className="text-right tabular-nums">{eur(engageGlobal)}</TableCell>
