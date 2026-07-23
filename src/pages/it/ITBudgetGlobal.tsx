@@ -486,6 +486,13 @@ export default function ITBudgetGlobal() {
     for (const r of supplierAggRows) m.set(r.budget_line_id, Number(r.supplier_ht_amount ?? 0));
     return m;
   }, [supplierAggRows]);
+  // Écritures rattachées à cette SEULE ligne (nb_links = 1) → constaté PAR LIGNE.
+  // Les pièces rapprochées au niveau groupe (nb_links >= 2) restent au groupe.
+  const supplierOwnByLine = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const r of supplierAggRows) m.set(r.budget_line_id, Number(r.supplier_ht_own ?? 0));
+    return m;
+  }, [supplierAggRows]);
   const engageByLine = useMemo(() => {
     const m = new Map<string, number>();
     for (const r of engageConstateData?.rows ?? []) m.set(r.budget_line_id, Number(r.engage ?? 0));
@@ -905,8 +912,9 @@ export default function ITBudgetGlobal() {
         _cf_amount:          engageByLine.get(l.id) ?? 0,
         _ff_amount:          constateByLine.get(l.id) ?? 0,
         _supplier_ht_amount: supplierAggByLine.get(l.id) ?? 0,
+        _supplier_ht_own:    supplierOwnByLine.get(l.id) ?? 0,
       })) as ITBudgetLineRow[],
-    [filteredLines, projectNameMap, engageByLine, constateByLine, supplierAggByLine]
+    [filteredLines, projectNameMap, engageByLine, constateByLine, supplierAggByLine, supplierOwnByLine]
   );
 
   /**

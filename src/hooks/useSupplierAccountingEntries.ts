@@ -303,6 +303,9 @@ export interface ITBudgetLineSupplierEntryAgg {
   supplier_ht_amount: number;
   supplier_ttc_amount: number;
   nb_supplier_entries: number;
+  /** Montant des écritures rattachées à cette SEULE ligne (nb_links = 1) — affichage par ligne. */
+  supplier_ht_own: number | null;
+  supplier_ttc_own: number | null;
 }
 
 export interface SupplierEntryLinkDetail {
@@ -355,7 +358,7 @@ export function useITBudgetLineSupplierEntriesAgg() {
     queryFn: async () => {
       const { data, error } = await sb
         .from('v_it_budget_line_supplier_entries_agg')
-        .select('budget_line_id, supplier_ht_amount, supplier_ttc_amount, nb_supplier_entries');
+        .select('budget_line_id, supplier_ht_amount, supplier_ttc_amount, nb_supplier_entries, supplier_ht_own, supplier_ttc_own');
       if (error) throw error;
       return (data ?? []) as ITBudgetLineSupplierEntryAgg[];
     },

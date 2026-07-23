@@ -55,25 +55,41 @@ export function ITGroupRapprochementDialog({ open, onClose, group }: Props) {
 
   const perLine = useMemo(() => (group?.rows ?? []).map((r) => ({
     row: r,
+    // Affichage PAR LIGNE : écritures propres à la ligne (nb_links = 1) uniquement.
     canon: computeBudgetCanon(r, {
+      cf_amount: (r as any)._cf_amount,
+      ff_amount: (r as any)._ff_amount,
+      supplier_ht_amount: (r as any)._supplier_ht_own,
+    }),
+    // Version complète (écritures réparties /nb lignes) → sert au total groupe.
+    canonFull: computeBudgetCanon(r, {
       cf_amount: (r as any)._cf_amount,
       ff_amount: (r as any)._ff_amount,
       supplier_ht_amount: (r as any)._supplier_ht_amount,
     }),
   })), [group]);
 
+  // Total groupe = version complète (chaque pièce comptée une fois au global).
   const totals = useMemo(
     () => perLine.reduce(
-      (a, { canon }) => ({
-        budget_initial: a.budget_initial + canon.budget_initial,
-        budget_revise: a.budget_revise + canon.budget_revise,
-        engage: a.engage + canon.engage,
-        constate: a.constate + canon.constate,
+      (a, { canonFull }) => ({
+        budget_initial: a.budget_initial + canonFull.budget_initial,
+        budget_revise: a.budget_revise + canonFull.budget_revise,
+        engage: a.engage + canonFull.engage,
+        constate: a.constate + canonFull.constate,
       }),
       { budget_initial: 0, budget_revise: 0, engage: 0, constate: 0 },
     ),
     [perLine],
   );
+
+  // Constaté affiché par ligne (écritures propres) → l'écart avec le total groupe
+  // = les pièces rapprochées AU NIVEAU GROUPE, non ventilées par ligne.
+  const constateLignes = useMemo(
+    () => perLine.reduce((s, { canon }) => s + canon.constate, 0),
+    [perLine],
+  );
+  const constateGroupe = Math.max(0, totals.constate - constateLignes);
 
   const budYY = group?.budYY ?? '';
   const reste = totals.budget_revise - totals.constate;
@@ -111,6 +127,14 @@ export function ITGroupRapprochementDialog({ open, onClose, group }: Props) {
             <p className={cn('text-sm font-bold tabular-nums px-1 rounded inline-block', consoTone(conso))}>{conso.toFixed(0)}%</p>
           </div>
         </div>
+
+        {constateGroupe > 0 && (
+          <p className="text-[11px] text-muted-foreground -mt-1">
+            Dont <span className="font-medium text-violet-700 dark:text-violet-400">{eur(constateGroupe)}</span> d'écritures
+            rapprochées <strong>au niveau du groupe</strong> (comptées ici, non ventilées par ligne). Le constaté affiché
+            par ligne ci-dessous ne reprend que les pièces rattachées spécifiquement à chaque ligne.
+          </p>
+        )}
 
         {/* Détail LIGNE PAR LIGNE */}
         <div className="flex-1 overflow-y-auto rounded-lg border">

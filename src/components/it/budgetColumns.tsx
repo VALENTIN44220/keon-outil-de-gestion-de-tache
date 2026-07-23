@@ -13,7 +13,8 @@ interface LineExtra {
   // Canon financier annuel HT — injecté par la page (pas en base)
   _cf_amount?: number;          // CF Divalto liées
   _ff_amount?: number;          // FF Divalto liées
-  _supplier_ht_amount?: number; // Écritures comptables rattachées (HT estimé)
+  _supplier_ht_amount?: number; // Écritures comptables rattachées (HT estimé, réparti /nb lignes)
+  _supplier_ht_own?: number;    // Écritures rattachées à CETTE seule ligne (nb_links = 1) — affichage par ligne
 }
 
 export type ITBudgetLineRow = ITBudgetLine & LineExtra;
@@ -195,13 +196,16 @@ export const IT_BUDGET_COLUMNS: ITBudgetColumnDef[] = [
     align: 'right',
     render: (l, h) => {
       const ff = Number(l._ff_amount ?? 0);
-      const sup = Number(l._supplier_ht_amount ?? 0);
+      // Par ligne : uniquement les écritures rattachées à CETTE ligne (nb_links=1).
+      // Les pièces rapprochées au niveau groupe restent comptées au groupe.
+      // Repli sur le montant complet si _supplier_ht_own n'est pas injecté.
+      const sup = Number(l._supplier_ht_own ?? l._supplier_ht_amount ?? 0);
       const cf = Number(l._cf_amount ?? 0);
       const revise = lineAnnualBudgetRevise(l);
       const constate = ff + sup;
       const engage = cf > 0 ? cf : (l.statut === 'engage_total' ? revise : 0);
       // Constaté > Engagé → orange (facture sans commande / dépassement engagement)
-      // Constaté > F26   → rouge (dépassement budget)
+      // Constaté > F   → rouge (dépassement budget)
       const overBudget = revise > 0 && constate > revise * 1.001;
       const overEngage = engage > 0 && constate > engage * 1.001 && !overBudget;
       const tooltip = [
@@ -232,7 +236,7 @@ export const IT_BUDGET_COLUMNS: ITBudgetColumnDef[] = [
     align: 'right',
     render: (l, h) => {
       const ff = Number(l._ff_amount ?? 0);
-      const sup = Number(l._supplier_ht_amount ?? 0);
+      const sup = Number(l._supplier_ht_own ?? l._supplier_ht_amount ?? 0); // écritures propres à la ligne
       const constate = ff + sup;
       const revise = lineAnnualBudgetRevise(l);
       if (revise <= 0) return <span className="text-muted-foreground">—</span>;
