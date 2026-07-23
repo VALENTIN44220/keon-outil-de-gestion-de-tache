@@ -12,6 +12,7 @@ import { BudgetLineRapprochementPanel } from '@/components/it/BudgetLineRapproch
 import { BudgetLineNdfPanel } from '@/components/it/BudgetLineNdfPanel';
 import { ITRHTab } from '@/components/it/ITRHTab';
 import { ITBudgetCopyYearDialog } from '@/components/it/ITBudgetCopyYearDialog';
+import { ITGroupRapprochementDialog, type GroupRapprochementInput } from '@/components/it/ITGroupRapprochementDialog';
 import { SupplierEntriesTab } from '@/components/it/SupplierEntriesTab';
 import { BudgetLineSupplierEntriesPanel } from '@/components/it/BudgetLineSupplierEntriesPanel';
 import { useITBudgetLineSupplierEntriesAgg } from '@/hooks/useSupplierAccountingEntries';
@@ -448,6 +449,7 @@ export default function ITBudgetGlobal() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [copyOpen, setCopyOpen] = useState(false);
+  const [groupBilan, setGroupBilan] = useState<GroupRapprochementInput | null>(null);
 
   const { prefs, isLoaded: prefsLoaded, updateColumns, updateFilters } = useITBudgetPreferences();
   const { data: companiesList = [] } = useCompanies();
@@ -1507,6 +1509,12 @@ export default function ITBudgetGlobal() {
           }}
         />
 
+        <ITGroupRapprochementDialog
+          open={!!groupBilan}
+          onClose={() => setGroupBilan(null)}
+          group={groupBilan}
+        />
+
         {linesLoading || !prefsLoaded ? (
           <BudgetPageSkeleton />
         ) : (
@@ -1839,7 +1847,12 @@ export default function ITBudgetGlobal() {
                                 : g.kind === 'facture' ? FileText
                                 : Layers;
                               return (
-                                <TableRow key={g.key} className={cn(g.kind === 'none' && 'bg-muted/30')}>
+                                <TableRow
+                                  key={g.key}
+                                  className={cn('cursor-pointer hover:bg-muted/50', g.kind === 'none' && 'bg-muted/30')}
+                                  onClick={() => setGroupBilan({ label: g.label, rows: g.rows, budYY })}
+                                  title="Voir le bilan de rapprochement (global + par ligne)"
+                                >
                                   <TableCell>
                                     <div className="flex items-center gap-2">
                                       <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
@@ -2372,6 +2385,22 @@ export default function ITBudgetGlobal() {
                                         >
                                           <Link2 className="h-3 w-3" />
                                           Rapprocher
+                                        </Button>
+                                      )}
+                                      {g.kind !== 'none' && (
+                                        <Button
+                                          type="button"
+                                          size="sm"
+                                          variant="outline"
+                                          className="h-6 text-[10px] px-2 gap-1"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setGroupBilan({ label: g.label, rows: g.rows, budYY });
+                                          }}
+                                          title="Voir le bilan de rapprochement du groupe (global + par ligne)"
+                                        >
+                                          <Boxes className="h-3 w-3" />
+                                          Bilan
                                         </Button>
                                       )}
                                       {g.kind !== 'none' && (() => {
