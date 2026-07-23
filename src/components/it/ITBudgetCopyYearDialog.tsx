@@ -257,6 +257,10 @@ export function ITBudgetCopyYearDialog({ targetAnnee, open, onClose, onDone }: P
               </button>
             </div>
           </div>
+          <p className="w-full text-[11px] text-muted-foreground">
+            Les montants sélectionnés (Budget B{sourceAnnee} ou Reforecast F{sourceAnnee}) sont copiés dans le
+            <strong> Budget {targetAnnee}</strong>. Le reforecast F{targetAnnee} reste vide : il se définira en cours d'année {targetAnnee}.
+          </p>
           <label className="flex items-center gap-2 cursor-pointer">
             <Checkbox checked={copyMonths} onCheckedChange={(c) => setCopyMonths(c === true)} />
             Copier aussi la ventilation mensuelle

@@ -124,7 +124,7 @@ export const IT_BUDGET_COLUMNS: ITBudgetColumnDef[] = [
   //   • Consommation > 100% → rouge ; > 80% → orange ; sinon vert
   {
     key: 'montant_budget',
-    label: 'BUD26',
+    label: 'BUD',
     defaultVisible: true,
     align: 'right',
     render: (l, h) => (
@@ -133,7 +133,7 @@ export const IT_BUDGET_COLUMNS: ITBudgetColumnDef[] = [
   },
   {
     key: 'montant_budget_revise',
-    label: 'F26',
+    label: 'F',
     defaultVisible: true,
     align: 'right',
     render: (l, h) => {
@@ -143,7 +143,7 @@ export const IT_BUDGET_COLUMNS: ITBudgetColumnDef[] = [
       return (
         <span
           className={cn('tabular-nums', isRevised && 'font-semibold text-violet-700')}
-          title={isRevised ? `Reforecast appliqué (BUD26 ${h.eur(initial)} → F26 ${h.eur(revise)})` : 'F26 = BUD26 (aucun reforecast)'}
+          title={isRevised ? `Reforecast appliqué (BUD ${h.eur(initial)} → F ${h.eur(revise)})` : 'F = BUD (aucun reforecast)'}
         >
           {h.eur(revise)}
         </span>
@@ -165,7 +165,7 @@ export const IT_BUDGET_COLUMNS: ITBudgetColumnDef[] = [
       const tooltip = fromStatut
         ? 'Engagé déclaratif (statut = Engagé total, pas de CF Divalto)'
         : cf > 0
-        ? `Somme CF Divalto liées : ${h.eur(cf)}${overBudget ? ` (dépasse F26 ${h.eur(revise)})` : ''}`
+        ? `Somme CF Divalto liées : ${h.eur(cf)}${overBudget ? ` (dépasse F ${h.eur(revise)})` : ''}`
         : undefined;
       return (
         <span
@@ -201,7 +201,7 @@ export const IT_BUDGET_COLUMNS: ITBudgetColumnDef[] = [
       const tooltip = [
         ff > 0 ? `FF Divalto : ${h.eur(ff)}` : null,
         sup > 0 ? `Écritures comptables (HT est.) : ${h.eur(sup)}` : null,
-        overBudget ? `⚠ dépasse F26 (${h.eur(revise)})` : null,
+        overBudget ? `⚠ dépasse F (${h.eur(revise)})` : null,
         overEngage ? `⚠ dépasse l'engagé (${h.eur(engage)})` : null,
       ].filter(Boolean).join(' · ');
       return (
@@ -243,7 +243,7 @@ export const IT_BUDGET_COLUMNS: ITBudgetColumnDef[] = [
       return (
         <span
           className={cn('tabular-nums inline-block px-1 rounded', tone)}
-          title={`Constaté ${h.eur(constate)} / F26 ${h.eur(revise)}`}
+          title={`Constaté ${h.eur(constate)} / F ${h.eur(revise)}`}
         >
           {pct.toFixed(0)}%
         </span>

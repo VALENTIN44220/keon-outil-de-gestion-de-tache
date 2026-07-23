@@ -114,6 +114,12 @@ function eur(n: number) {
   return n.toLocaleString('fr-FR', EUR_OPTS);
 }
 
+/** Suffixe année sur 2 chiffres pour les libellés BUD/F (ex : 2027 → "27"). */
+function yy2(y: number | string | null | undefined): string {
+  const s = String(y ?? '').trim();
+  return s.length >= 2 ? s.slice(-2) : s;
+}
+
 const MOIS_COURTS = ['', 'Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
 const MOIS_LONGS = [
   'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
@@ -345,7 +351,7 @@ function ExpandedMonths({ line }: { line: ITBudgetLine }) {
           <tr className="border-b">
             <th className="text-left py-2 px-2 font-medium text-muted-foreground">Mois</th>
             <th className="text-right py-2 px-2 font-medium text-muted-foreground">Budget initial</th>
-            <th className="text-right py-2 px-2 font-medium text-violet-700 dark:text-violet-400">Reforecast F26</th>
+            <th className="text-right py-2 px-2 font-medium text-violet-700 dark:text-violet-400">Reforecast F{yy2((line as any).annee ?? (line as any).exercice)}</th>
             <th className="text-right py-2 px-2 font-medium text-muted-foreground">Commandé</th>
             <th className="text-right py-2 px-2 font-medium text-muted-foreground">Facturé</th>
             <th className="text-left py-2 px-2 font-medium text-muted-foreground">Réf. Commande(s)</th>
@@ -509,9 +515,35 @@ export default function ITBudgetGlobal() {
     bySousCategorie,
   } = useITBudgetGlobal(filters, { engageByLine, constateByLine, supplierAggByLine });
 
+  // ── Coût RH chargé (onglet RH) intégré au consolidé ──────────────────────
+  // Les salaires IT ne sont pas des lignes budgétaires mais un coût certain :
+  // on les ajoute aux KPI GLOBAUX (budget initial/révisé/engagé/constaté) de la
+  // vue consolidée. On n'ajoute PAS le RH si un filtre catégorie/type restreint
+  // l'affichage à un sous-ensemble de lignes (le RH n'est pas une catégorie de ligne).
+  const [rhChargeTotal, setRhChargeTotal] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const { data } = await (supabase as any)
+        .from('v_it_rh_cout').select('cout_charge_annuel').eq('annee', filters.annee);
+      if (!cancelled) {
+        setRhChargeTotal((data ?? []).reduce((a: number, r: any) => a + (Number(r.cout_charge_annuel) || 0), 0));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [filters.annee]);
+  const rhToInclude = (!filters.categorie && !filters.type_depense) ? rhChargeTotal : 0;
+
   // KPI canoniques exposés par le hook — alias rétro-compat pour les consommateurs locaux.
-  const engageGlobal   = kpis.engage;
-  const constateGlobal = kpis.constate;
+  // Les globaux (cards + total bilan) incluent le coût RH ; les breakdowns par
+  // ligne/groupe restent sur les seules lignes budgétaires.
+  const engageGlobal   = kpis.engage + rhToInclude;
+  const constateGlobal = kpis.constate + rhToInclude;
+
+  // Libellés colonnes budget/reforecast dérivés de l'année affichée (B27/F27…).
+  const budYY = yy2(filters.annee);
+  const LBL_BUD = `BUD${budYY}`;
+  const LBL_F = `F${budYY}`;
 
   // Ventilation mensuelle + par fournisseur pour les cards de la synthèse
   const { monthlyRows, supplierRows, linkedRefs } = useITBudgetGlobalBreakdown(lines);
@@ -1023,8 +1055,11 @@ export default function ITBudgetGlobal() {
     [expenses],
   );
 
-  const revisionsDelta = kpis.budget_revise - kpis.budget_initial;
-  const budgetReviseGlobal = kpis.budget_revise;
+  // Globaux budget avec RH (pour les cards + bilan). Le delta reste inchangé (RH
+  // ajouté à l'identique des deux côtés).
+  const budgetInitialGlobal = kpis.budget_initial + rhToInclude;
+  const budgetReviseGlobal = kpis.budget_revise + rhToInclude;
+  const revisionsDelta = budgetReviseGlobal - budgetInitialGlobal;
 
   /**
    * Forecast corrigé : décaissement anticipé à fin d'année = max(engagé, constaté)
@@ -1034,17 +1069,17 @@ export default function ITBudgetGlobal() {
    * facture arrive sans commande Divalto associée (constate > engage).
    */
   const forecastCorrige = Math.max(engageGlobal, constateGlobal) + manuel_prevu;
-  const ecartCorrige = forecastCorrige - kpis.budget_revise;
+  const ecartCorrige = forecastCorrige - budgetReviseGlobal;
   const depassementCorrige = Math.max(ecartCorrige, 0);
   const economieCorrigee = Math.max(-ecartCorrige, 0);
 
   const tauxConsommationBudgetPct = useMemo(() => {
-    const br = Number(kpis.budget_revise);
+    const br = Number(budgetReviseGlobal);
     const constate = Number(constateGlobal) || 0;
     if (!Number.isFinite(br) || br <= 0) return 0;
     const pct = (constate / br) * 100;
     return Math.min(100, Math.max(0, Math.round(pct * 10) / 10));
-  }, [kpis.budget_revise, constateGlobal]);
+  }, [budgetReviseGlobal, constateGlobal]);
 
   const typeCardStyle: Record<string, { border: string; bg: string }> = {
     Opex: { border: 'border-blue-200', bg: 'bg-blue-50/50 dark:bg-blue-950/20' },
@@ -1482,14 +1517,20 @@ export default function ITBudgetGlobal() {
                   <span className="text-xs font-medium text-muted-foreground">Budget initial</span>
                   <TrendingUp className="h-4 w-4 text-slate-600 shrink-0" />
                 </div>
-                <p className="mt-2 text-xl font-bold tabular-nums text-slate-800 dark:text-slate-100">{eur(kpis.budget_initial)}</p>
+                <p className="mt-2 text-xl font-bold tabular-nums text-slate-800 dark:text-slate-100">{eur(budgetInitialGlobal)}</p>
+                {rhToInclude > 0 && (
+                  <p className="mt-1 text-[10px] text-muted-foreground leading-tight">dont RH {eur(rhToInclude)}</p>
+                )}
               </div>
               <div className="flex flex-1 min-w-[160px] max-w-[220px] flex-col rounded-xl border border-blue-200 bg-blue-50/50 p-4 shadow-sm dark:bg-blue-950/20">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs font-medium text-muted-foreground">Budget révisé</span>
                   <RefreshCw className="h-4 w-4 text-blue-600 shrink-0" />
                 </div>
-                <p className="mt-2 text-xl font-bold tabular-nums text-blue-800 dark:text-blue-200">{eur(kpis.budget_revise)}</p>
+                <p className="mt-2 text-xl font-bold tabular-nums text-blue-800 dark:text-blue-200">{eur(budgetReviseGlobal)}</p>
+                {rhToInclude > 0 && (
+                  <p className="mt-1 text-[10px] text-muted-foreground leading-tight">dont RH {eur(rhToInclude)}</p>
+                )}
               </div>
               <div className="flex flex-1 min-w-[160px] max-w-[220px] flex-col rounded-xl border border-indigo-200 bg-indigo-50/50 p-4 shadow-sm dark:bg-indigo-950/20">
                 <div className="flex items-center justify-between gap-2">
@@ -1534,7 +1575,7 @@ export default function ITBudgetGlobal() {
                   <span className="text-sm font-medium">Taux de consommation budgétaire</span>
                   <span className="text-xs text-muted-foreground sm:text-right">
                     {tauxConsommationBudgetPct.toLocaleString('fr-FR', { maximumFractionDigits: 1 })}% — Constaté{' '}
-                    {eur(constateGlobal)} / Budget révisé {eur(kpis.budget_revise)}
+                    {eur(constateGlobal)} / Budget révisé {eur(budgetReviseGlobal)}
                   </span>
                 </div>
                 <Progress value={tauxConsommationBudgetPct} className="h-3" />
@@ -1622,7 +1663,7 @@ export default function ITBudgetGlobal() {
                             <YAxis type="category" dataKey="sous_categorie" width={120} tick={{ fontSize: 10 }} />
                             <RechartsTooltip formatter={(value: number) => eur(value)} />
                             <Legend wrapperStyle={{ fontSize: 10 }} />
-                            <Bar dataKey="budget_revise" name="F26" fill="#6366f1" radius={[0, 4, 4, 0]} />
+                            <Bar dataKey="budget_revise" name={LBL_F} fill="#6366f1" radius={[0, 4, 4, 0]} />
                             <Bar dataKey="engage" name="Engagé" fill="#f59e0b" radius={[0, 4, 4, 0]} />
                             <Bar dataKey="constate" name="Constaté" fill="#10b981" radius={[0, 4, 4, 0]} />
                           </BarChart>
@@ -1654,8 +1695,8 @@ export default function ITBudgetGlobal() {
                             <YAxis tick={{ fontSize: 10 }} />
                             <RechartsTooltip formatter={(value: number) => eur(value)} />
                             <Legend />
-                            <Bar dataKey="budget_initial" name="BUD26" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                            <Bar dataKey="budget_revise" name="F26" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                            <Bar dataKey="budget_initial" name={LBL_BUD} fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                            <Bar dataKey="budget_revise" name={LBL_F} fill="#6366f1" radius={[4, 4, 0, 0]} />
                             <Bar dataKey="engage" name="Engagé" fill="#f59e0b" radius={[4, 4, 0, 0]} />
                             <Bar dataKey="constate" name="Constaté" fill="#10b981" radius={[4, 4, 0, 0]} />
                           </BarChart>
@@ -1680,7 +1721,7 @@ export default function ITBudgetGlobal() {
                             <YAxis type="category" dataKey="entite" width={100} tick={{ fontSize: 10 }} />
                             <RechartsTooltip formatter={(value: number) => eur(value)} />
                             <Legend wrapperStyle={{ fontSize: 10 }} />
-                            <Bar dataKey="budget_revise" name="F26" fill="#6366f1" radius={[0, 4, 4, 0]} />
+                            <Bar dataKey="budget_revise" name={LBL_F} fill="#6366f1" radius={[0, 4, 4, 0]} />
                             <Bar dataKey="engage" name="Engagé" fill="#f59e0b" radius={[0, 4, 4, 0]} />
                             <Bar dataKey="constate" name="Constaté" fill="#10b981" radius={[0, 4, 4, 0]} />
                           </BarChart>
@@ -1713,7 +1754,7 @@ export default function ITBudgetGlobal() {
                             <YAxis type="category" dataKey="fournisseur" width={130} tick={{ fontSize: 10 }} />
                             <RechartsTooltip formatter={(value: number) => eur(value)} />
                             <Legend wrapperStyle={{ fontSize: 10 }} />
-                            <Bar dataKey="budget_revise" name="F26" fill="#6366f1" radius={[0, 4, 4, 0]} />
+                            <Bar dataKey="budget_revise" name={LBL_F} fill="#6366f1" radius={[0, 4, 4, 0]} />
                             <Bar dataKey="engage" name="Engagé" fill="#f59e0b" radius={[0, 4, 4, 0]} />
                             <Bar dataKey="constate" name="Constaté" fill="#10b981" radius={[0, 4, 4, 0]} />
                           </BarChart>
@@ -1742,7 +1783,7 @@ export default function ITBudgetGlobal() {
                             <YAxis type="category" dataKey="projet" width={140} tick={{ fontSize: 10 }} />
                             <RechartsTooltip formatter={(value: number) => eur(value)} />
                             <Legend wrapperStyle={{ fontSize: 10 }} />
-                            <Bar dataKey="budget_revise" name="F26" fill="#6366f1" radius={[0, 4, 4, 0]} />
+                            <Bar dataKey="budget_revise" name={LBL_F} fill="#6366f1" radius={[0, 4, 4, 0]} />
                             <Bar dataKey="engage" name="Engagé" fill="#f59e0b" radius={[0, 4, 4, 0]} />
                             <Bar dataKey="constate" name="Constaté" fill="#10b981" radius={[0, 4, 4, 0]} />
                           </BarChart>
@@ -1757,9 +1798,9 @@ export default function ITBudgetGlobal() {
                   <CardContent className="pt-6">
                     <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
                       <Boxes className="h-4 w-4" />
-                      Bilan par groupe — BUD26 / F26 / Engagé / Constaté
+                      Bilan par groupe — {LBL_BUD} / {LBL_F} / Engagé / Constaté
                       <span className="text-xs font-normal text-muted-foreground ml-2">
-                        ({summaryGroups.length} groupes — trié par F26 desc.)
+                        ({summaryGroups.length} groupes — trié par {LBL_F} desc.)
                       </span>
                     </h3>
                     {summaryGroups.length === 0 ? (
@@ -1773,12 +1814,12 @@ export default function ITBudgetGlobal() {
                             <TableRow>
                               <TableHead>Groupe</TableHead>
                               <TableHead className="text-right">Lignes</TableHead>
-                              <TableHead className="text-right">BUD26</TableHead>
-                              <TableHead className="text-right">F26</TableHead>
+                              <TableHead className="text-right">{LBL_BUD}</TableHead>
+                              <TableHead className="text-right">{LBL_F}</TableHead>
                               <TableHead className="text-right">Engagé</TableHead>
                               <TableHead className="text-right">Constaté</TableHead>
                               <TableHead className="text-right">Conso %</TableHead>
-                              <TableHead className="text-right">Reste F26</TableHead>
+                              <TableHead className="text-right">Reste {LBL_F}</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -2009,8 +2050,8 @@ export default function ITBudgetGlobal() {
                     <Table>
                       <TableBody>
                         <TableRow>
-                          <TableCell className="font-medium">Budget initial</TableCell>
-                          <TableCell className="text-right tabular-nums">{eur(kpis.budget_initial)}</TableCell>
+                          <TableCell className="font-medium">Budget initial{rhToInclude > 0 ? ' (dont RH)' : ''}</TableCell>
+                          <TableCell className="text-right tabular-nums">{eur(budgetInitialGlobal)}</TableCell>
                         </TableRow>
                         <TableRow>
                           <TableCell className="font-medium">Révisions</TableCell>
@@ -2019,8 +2060,8 @@ export default function ITBudgetGlobal() {
                           </TableCell>
                         </TableRow>
                         <TableRow>
-                          <TableCell className="font-medium">Budget révisé</TableCell>
-                          <TableCell className="text-right tabular-nums">{eur(kpis.budget_revise)}</TableCell>
+                          <TableCell className="font-medium">Budget révisé{rhToInclude > 0 ? ' (dont RH)' : ''}</TableCell>
+                          <TableCell className="text-right tabular-nums">{eur(budgetReviseGlobal)}</TableCell>
                         </TableRow>
                         <TableRow>
                           <TableCell className="font-medium">Dépenses manuelles prévues</TableCell>
@@ -2169,9 +2210,13 @@ export default function ITBudgetGlobal() {
                           {prefs.columns_config.order.map((key) => {
                             const col = IT_BUDGET_COLUMNS.find((c) => c.key === key);
                             if (!col) return null;
+                            // Libellés budget/reforecast dérivés de l'année affichée (BUD27/F27…).
+                            const label = key === 'montant_budget' ? LBL_BUD
+                              : key === 'montant_budget_revise' ? LBL_F
+                              : col.label;
                             return (
                               <TableHead key={key} className={cn(col.align === 'right' && 'text-right', col.className)}>
-                                {col.label}
+                                {label}
                               </TableHead>
                             );
                           })}
@@ -2341,8 +2386,8 @@ export default function ITBudgetGlobal() {
                                           : 'text-muted-foreground';
                                         return (
                                           <span className="ml-auto flex items-center gap-3 text-xs text-muted-foreground">
-                                            <span>BUD26 <span className="tabular-nums text-foreground font-medium">{eur(g.totalBudgetInitial)}</span></span>
-                                            <span>F26 <span className="tabular-nums text-foreground font-medium">{eur(g.totalBudgetRevise)}</span></span>
+                                            <span>{LBL_BUD} <span className="tabular-nums text-foreground font-medium">{eur(g.totalBudgetInitial)}</span></span>
+                                            <span>{LBL_F} <span className="tabular-nums text-foreground font-medium">{eur(g.totalBudgetRevise)}</span></span>
                                             <span>Engagé <span className={cn(
                                               'tabular-nums font-medium px-1 rounded',
                                               !overEngage && 'text-indigo-700 dark:text-indigo-400',
