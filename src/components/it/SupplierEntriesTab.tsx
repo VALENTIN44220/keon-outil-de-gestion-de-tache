@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Select,
@@ -146,12 +147,44 @@ export function SupplierEntriesTab({ annee, entite }: Props) {
 
   // ── Dialog rattachement / audit ─────────────────────────────────────
   const [linkOpen, setLinkOpen] = useState(false);
-  const [linkEntry, setLinkEntry] = useState<SupplierAccountingEntry | null>(null);
+  const [linkEntries, setLinkEntries] = useState<SupplierAccountingEntry[]>([]);
   const [auditOpen, setAuditOpen] = useState(false);
 
+  // ── Sélection multiple (rattachement en lot) ────────────────────────
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
+  const toggleKey = (key: string) => setSelectedKeys((prev) => {
+    const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n;
+  });
+  const pageKeys = useMemo(() => entries.map((e) => e.entry_key), [entries]);
+  const allPageSelected = pageKeys.length > 0 && pageKeys.every((k) => selectedKeys.has(k));
+  const toggleSelectAllPage = () => setSelectedKeys((prev) => {
+    const n = new Set(prev);
+    if (allPageSelected) pageKeys.forEach((k) => n.delete(k));
+    else pageKeys.forEach((k) => n.add(k));
+    return n;
+  });
+  const selectedEntries = useMemo(
+    () => entries.filter((e) => selectedKeys.has(e.entry_key)),
+    [entries, selectedKeys],
+  );
+  const selectedTotalHt = useMemo(
+    () => selectedEntries.reduce((s, e) => s + htEstime(e.solde), 0),
+    [selectedEntries],
+  );
+
   const openLink = (entry: SupplierAccountingEntry) => {
-    setLinkEntry(entry);
+    setLinkEntries([entry]);
     setLinkOpen(true);
+  };
+  const openLinkBulk = () => {
+    if (selectedEntries.length === 0) return;
+    setLinkEntries(selectedEntries);
+    setLinkOpen(true);
+  };
+  // Vide la sélection à la fermeture du dialog (après un rattachement réussi).
+  const handleLinkOpenChange = (o: boolean) => {
+    setLinkOpen(o);
+    if (!o) setSelectedKeys(new Set());
   };
 
   const handleUnlink = async (linkId: string) => {
@@ -328,6 +361,21 @@ export function SupplierEntriesTab({ annee, entite }: Props) {
         </CardContent>
       </Card>
 
+      {/* Barre de rattachement multiple */}
+      {selectedKeys.size > 0 && (
+        <div className="flex items-center gap-3 rounded-lg border border-primary/40 bg-primary/5 px-3 py-2 text-sm">
+          <span className="font-medium">{selectedKeys.size} écriture{selectedKeys.size > 1 ? 's' : ''} sélectionnée{selectedKeys.size > 1 ? 's' : ''}</span>
+          <span className="text-xs text-muted-foreground">Total HT est. {eur(selectedTotalHt)}</span>
+          <Button size="sm" className="h-7 gap-1.5 ml-auto" onClick={openLinkBulk}>
+            <LinkIcon className="h-3.5 w-3.5" />
+            Rattacher la sélection à une ligne
+          </Button>
+          <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setSelectedKeys(new Set())}>
+            Annuler
+          </Button>
+        </div>
+      )}
+
       {/* Table */}
       <Card className="border-border/50">
         <CardContent className="p-0">
@@ -344,6 +392,13 @@ export function SupplierEntriesTab({ annee, entite }: Props) {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/30 hover:bg-muted/30">
+                    <TableHead className="w-8">
+                      <Checkbox
+                        checked={allPageSelected}
+                        onCheckedChange={toggleSelectAllPage}
+                        aria-label="Tout sélectionner"
+                      />
+                    </TableHead>
                     <TableHead className="text-xs whitespace-nowrap">Date</TableHead>
                     <TableHead className="text-xs">DOS</TableHead>
                     <TableHead className="text-xs">Journal</TableHead>
@@ -362,8 +417,16 @@ export function SupplierEntriesTab({ annee, entite }: Props) {
                   {entries.map((e) => {
                     const sc = STATUS_LABEL[e.status_user] ?? STATUS_LABEL.pending;
                     const myLinks = linkByEntry.get(e.entry_key) ?? [];
+                    const isSelected = selectedKeys.has(e.entry_key);
                     return (
-                      <TableRow key={e.entry_key} className="hover:bg-muted/20">
+                      <TableRow key={e.entry_key} className={cn('hover:bg-muted/20', isSelected && 'bg-primary/5')}>
+                        <TableCell className="py-1">
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={() => toggleKey(e.entry_key)}
+                            aria-label="Sélectionner l'écriture"
+                          />
+                        </TableCell>
                         <TableCell className="text-xs whitespace-nowrap tabular-nums">
                           {e.date ?? '—'}
                         </TableCell>
@@ -475,11 +538,11 @@ export function SupplierEntriesTab({ annee, entite }: Props) {
       )}
 
       <SupplierEntryLinkDialog
-        entry={linkEntry}
+        entries={linkEntries}
         annee={annee}
         entite={entite}
         open={linkOpen}
-        onOpenChange={setLinkOpen}
+        onOpenChange={handleLinkOpenChange}
       />
 
       <SupplierEntriesAuditDialog open={auditOpen} onOpenChange={setAuditOpen} />

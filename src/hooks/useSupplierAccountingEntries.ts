@@ -184,6 +184,7 @@ export function useLinkSupplierEntry() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['supplier-entry-links'] });
       qc.invalidateQueries({ queryKey: ['it-budget-line-supplier-entries'] });
+      qc.invalidateQueries({ queryKey: ['it-budget-line-supplier-entries-agg'] });
     },
   });
 }
@@ -213,6 +214,7 @@ export function useLinkSupplierEntries() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['supplier-entry-links'] });
       qc.invalidateQueries({ queryKey: ['it-budget-line-supplier-entries'] });
+      qc.invalidateQueries({ queryKey: ['it-budget-line-supplier-entries-agg'] });
     },
   });
 }

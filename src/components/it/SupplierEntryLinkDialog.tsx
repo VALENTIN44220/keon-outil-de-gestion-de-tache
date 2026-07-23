@@ -1,7 +1,8 @@
 /**
- * Dialog : rattache une écriture comptable fournisseur (supplier_accounting_entries)
- * à une ligne budgétaire IT (it_budget_lines). V1 simple : un sélecteur texte
- * filtre la liste des lignes par description / catégorie / fournisseur / id.
+ * Dialog : rattache UNE OU PLUSIEURS écritures comptables fournisseur
+ * (supplier_accounting_entries) à une ligne budgétaire IT (it_budget_lines).
+ * Un sélecteur texte filtre la liste des lignes ; toutes les écritures reçues
+ * sont rattachées à la ligne choisie (rattachement multiple).
  */
 import { useMemo, useState } from 'react';
 import {
@@ -22,7 +23,7 @@ import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { extractErrorMessage } from '@/lib/extractErrorMessage';
 import { useITBudgetGlobal } from '@/hooks/useITProjectBudget';
-import { useLinkSupplierEntry, type SupplierAccountingEntry } from '@/hooks/useSupplierAccountingEntries';
+import { useLinkSupplierEntries, type SupplierAccountingEntry } from '@/hooks/useSupplierAccountingEntries';
 
 const eur = (n: number | null | undefined) =>
   (n ?? 0).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
@@ -34,20 +35,29 @@ const abs = (n: number | null | undefined): number => Math.abs(n ?? 0);
 const htEstime = (ttc: number | null | undefined): number => abs(ttc) / (1 + TVA_STD);
 
 interface Props {
-  entry: SupplierAccountingEntry | null;
+  /** Écriture(s) à rattacher (1 = rattachement simple, N = rattachement multiple). */
+  entries: SupplierAccountingEntry[];
   annee: number;
   entite: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-export function SupplierEntryLinkDialog({ entry, annee, entite, open, onOpenChange }: Props) {
+export function SupplierEntryLinkDialog({ entries, annee, entite, open, onOpenChange }: Props) {
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [note, setNote] = useState('');
 
   const { lines, linesLoading } = useITBudgetGlobal({ annee, entite });
-  const linkMutation = useLinkSupplierEntry();
+  const linkMutation = useLinkSupplierEntries();
+
+  const isMulti = entries.length > 1;
+  const totalTtc = entries.reduce((s, e) => s + abs(e.solde), 0);
+  const totalHt = htEstime(totalTtc);
+  // Fournisseur commun (pour préremplir le filtre) si toutes les écritures le partagent.
+  const commonSupplier = entries.length > 0 && entries.every((e) => e.supplier_code === entries[0].supplier_code)
+    ? entries[0].supplier_code
+    : null;
 
   // Filtre les lignes par texte libre
   const filtered = useMemo(() => {
@@ -63,13 +73,13 @@ export function SupplierEntryLinkDialog({ entry, annee, entite, open, onOpenChan
     return result.slice(0, 100); // garde-fou
   }, [lines, search]);
 
-  // Pré-remplit le filtre avec le fournisseur de l'écriture (souvent utile)
+  // Pré-remplit le filtre avec le fournisseur commun (souvent utile)
   const handleOpenChange = (o: boolean) => {
-    if (o && entry?.supplier_code) {
-      setSearch(entry.supplier_code);
+    if (o) {
+      setSearch(commonSupplier ?? '');
       setSelectedId(null);
       setNote('');
-    } else if (!o) {
+    } else {
       setSelectedId(null);
       setNote('');
     }
@@ -77,14 +87,16 @@ export function SupplierEntryLinkDialog({ entry, annee, entite, open, onOpenChan
   };
 
   const handleSubmit = async () => {
-    if (!entry || !selectedId) return;
+    if (entries.length === 0 || !selectedId) return;
     try {
-      await linkMutation.mutateAsync({
+      const res = await linkMutation.mutateAsync({
         budgetLineId: selectedId,
-        entryKey: entry.entry_key,
+        entryKeys: entries.map((e) => e.entry_key),
         note: note.trim() || undefined,
       });
-      toast({ title: 'Écriture rattachée' });
+      toast({
+        title: res.inserted > 1 ? `${res.inserted} écritures rattachées` : 'Écriture rattachée',
+      });
       onOpenChange(false);
     } catch (e) {
       toast({
@@ -99,35 +111,71 @@ export function SupplierEntryLinkDialog({ entry, annee, entite, open, onOpenChan
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Rattacher à une ligne budgétaire IT</DialogTitle>
+          <DialogTitle>
+            Rattacher {isMulti ? `${entries.length} écritures` : 'une écriture'} à une ligne budgétaire IT
+          </DialogTitle>
           <DialogDescription>
-            Choisis la ligne du budget IT à laquelle cette écriture comptable doit être imputée.
+            {isMulti
+              ? 'Choisis la ligne du budget IT à laquelle ces écritures comptables seront toutes imputées.'
+              : 'Choisis la ligne du budget IT à laquelle cette écriture comptable doit être imputée.'}
           </DialogDescription>
         </DialogHeader>
 
-        {entry && (
+        {entries.length === 1 && (
           <div className="border rounded-md p-3 bg-muted/40 text-xs space-y-1">
             <div className="flex items-center justify-between gap-3">
               <span className="font-mono text-[11px] text-muted-foreground">
-                {entry.dos} · {entry.journal} · {entry.numero}
+                {entries[0].dos} · {entries[0].journal} · {entries[0].numero}
               </span>
               <div className="flex items-baseline gap-3 text-right">
                 <div>
                   <div className="text-[9px] uppercase text-muted-foreground leading-none">TTC</div>
-                  <div className="font-semibold tabular-nums">{eur(abs(entry.solde))}</div>
+                  <div className="font-semibold tabular-nums">{eur(abs(entries[0].solde))}</div>
                 </div>
                 <div>
                   <div className="text-[9px] uppercase text-muted-foreground leading-none">HT est. (20%)</div>
-                  <div className="font-semibold tabular-nums text-violet-700">{eur(htEstime(entry.solde))}</div>
+                  <div className="font-semibold tabular-nums text-violet-700">{eur(htEstime(entries[0].solde))}</div>
                 </div>
               </div>
             </div>
             <div className="font-medium truncate">
-              {entry.supplier_name ?? entry.supplier_code ?? '—'}
-              <span className="text-muted-foreground font-normal"> — {entry.libelle_ecriture ?? ''}</span>
+              {entries[0].supplier_name ?? entries[0].supplier_code ?? '—'}
+              <span className="text-muted-foreground font-normal"> — {entries[0].libelle_ecriture ?? ''}</span>
             </div>
             <div className="text-[10px] text-amber-700 pt-1">
               ⚠️ Le budget IT est en HT. Compare le <b>HT estimé</b> au <b>montant budgété</b> de la ligne sélectionnée ci-dessous.
+            </div>
+          </div>
+        )}
+
+        {isMulti && (
+          <div className="border rounded-md p-3 bg-muted/40 text-xs space-y-2">
+            <div className="flex items-center justify-between gap-3">
+              <span className="font-medium">{entries.length} écritures sélectionnées</span>
+              <div className="flex items-baseline gap-3 text-right">
+                <div>
+                  <div className="text-[9px] uppercase text-muted-foreground leading-none">Total TTC</div>
+                  <div className="font-semibold tabular-nums">{eur(totalTtc)}</div>
+                </div>
+                <div>
+                  <div className="text-[9px] uppercase text-muted-foreground leading-none">Total HT est.</div>
+                  <div className="font-semibold tabular-nums text-violet-700">{eur(totalHt)}</div>
+                </div>
+              </div>
+            </div>
+            <div className="max-h-24 overflow-y-auto divide-y rounded border bg-background/60">
+              {entries.map((e) => (
+                <div key={e.entry_key} className="flex items-center justify-between gap-2 px-2 py-1">
+                  <span className="truncate">
+                    <span className="font-mono text-[10px] text-muted-foreground mr-1">{e.journal}/{e.numero}</span>
+                    {e.supplier_name ?? e.supplier_code ?? '—'}
+                  </span>
+                  <span className="tabular-nums shrink-0">{eur(abs(e.solde))}</span>
+                </div>
+              ))}
+            </div>
+            <div className="text-[10px] text-amber-700">
+              ⚠️ Budget IT en HT. Toutes ces écritures seront rattachées à la même ligne.
             </div>
           </div>
         )}
@@ -219,7 +267,7 @@ export function SupplierEntryLinkDialog({ entry, annee, entite, open, onOpenChan
             ) : (
               <LinkIcon className="h-4 w-4 mr-2" />
             )}
-            Rattacher
+            {isMulti ? `Rattacher ${entries.length} écritures` : 'Rattacher'}
           </Button>
         </DialogFooter>
       </DialogContent>
