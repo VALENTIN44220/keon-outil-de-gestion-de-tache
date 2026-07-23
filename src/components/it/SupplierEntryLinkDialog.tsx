@@ -18,12 +18,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Search, Link as LinkIcon } from 'lucide-react';
+import { Loader2, Search, Link as LinkIcon, Boxes, Rows3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { extractErrorMessage } from '@/lib/extractErrorMessage';
 import { useITBudgetGlobal } from '@/hooks/useITProjectBudget';
-import { useLinkSupplierEntries, type SupplierAccountingEntry } from '@/hooks/useSupplierAccountingEntries';
+import { useITBudgetGroups } from '@/hooks/useITBudgetGroups';
+import { useLinkSupplierEntries, useLinkSupplierEntriesToLines, type SupplierAccountingEntry } from '@/hooks/useSupplierAccountingEntries';
 
 const eur = (n: number | null | undefined) =>
   (n ?? 0).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
@@ -45,11 +46,39 @@ interface Props {
 
 export function SupplierEntryLinkDialog({ entries, annee, entite, open, onOpenChange }: Props) {
   const [search, setSearch] = useState('');
+  const [mode, setMode] = useState<'ligne' | 'groupe'>('ligne');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [note, setNote] = useState('');
 
   const { lines, linesLoading } = useITBudgetGlobal({ annee, entite });
+  const { groups } = useITBudgetGroups();
   const linkMutation = useLinkSupplierEntries();
+  const linkGroupMutation = useLinkSupplierEntriesToLines();
+
+  // Regroupements de l'exercice + nb de lignes membres (depuis les lignes chargées).
+  const groupList = useMemo(() => {
+    const byGroup = new Map<string, { lineIds: string[]; total: number }>();
+    for (const l of lines as any[]) {
+      const gid = l.rapprochement_group_id;
+      if (!gid) continue;
+      const g = byGroup.get(gid) ?? { lineIds: [], total: 0 };
+      g.lineIds.push(l.id);
+      g.total += Number(l.montant_budget_revise ?? l.montant_budget ?? 0);
+      byGroup.set(gid, g);
+    }
+    const q = search.trim().toLowerCase();
+    return groups
+      .map((g) => ({
+        id: g.id,
+        nom: g.nom,
+        lineIds: byGroup.get(g.id)?.lineIds ?? [],
+        total: byGroup.get(g.id)?.total ?? 0,
+      }))
+      .filter((g) => g.lineIds.length > 0)
+      .filter((g) => !q || g.nom.toLowerCase().includes(q))
+      .sort((a, b) => a.nom.localeCompare(b.nom));
+  }, [groups, lines, search]);
 
   const isMulti = entries.length > 1;
   const totalTtc = entries.reduce((s, e) => s + abs(e.solde), 0);
@@ -77,26 +106,45 @@ export function SupplierEntryLinkDialog({ entries, annee, entite, open, onOpenCh
   const handleOpenChange = (o: boolean) => {
     if (o) {
       setSearch(commonSupplier ?? '');
+      setMode('ligne');
       setSelectedId(null);
+      setSelectedGroupId(null);
       setNote('');
     } else {
       setSelectedId(null);
+      setSelectedGroupId(null);
       setNote('');
     }
     onOpenChange(o);
   };
 
+  const busy = linkMutation.isPending || linkGroupMutation.isPending;
+  const canSubmit = entries.length > 0 && (mode === 'ligne' ? !!selectedId : !!selectedGroupId);
+
   const handleSubmit = async () => {
-    if (entries.length === 0 || !selectedId) return;
+    if (!canSubmit) return;
+    const entryKeys = entries.map((e) => e.entry_key);
     try {
-      const res = await linkMutation.mutateAsync({
-        budgetLineId: selectedId,
-        entryKeys: entries.map((e) => e.entry_key),
-        note: note.trim() || undefined,
-      });
-      toast({
-        title: res.inserted > 1 ? `${res.inserted} écritures rattachées` : 'Écriture rattachée',
-      });
+      if (mode === 'ligne') {
+        const res = await linkMutation.mutateAsync({
+          budgetLineId: selectedId!,
+          entryKeys,
+          note: note.trim() || undefined,
+        });
+        toast({ title: res.inserted > 1 ? `${res.inserted} écritures rattachées` : 'Écriture rattachée' });
+      } else {
+        const grp = groupList.find((g) => g.id === selectedGroupId);
+        if (!grp) return;
+        await linkGroupMutation.mutateAsync({
+          budgetLineIds: grp.lineIds,
+          entryKeys,
+          note: note.trim() || undefined,
+        });
+        toast({
+          title: 'Rattaché au regroupement',
+          description: `${entries.length} écriture(s) × ${grp.lineIds.length} ligne(s) — ${grp.nom}`,
+        });
+      }
       onOpenChange(false);
     } catch (e) {
       toast({
@@ -175,74 +223,133 @@ export function SupplierEntryLinkDialog({ entries, annee, entite, open, onOpenCh
               ))}
             </div>
             <div className="text-[10px] text-amber-700">
-              ⚠️ Budget IT en HT. Toutes ces écritures seront rattachées à la même ligne.
+              ⚠️ Budget IT en HT. Toutes ces écritures seront rattachées à la cible choisie ci-dessous.
             </div>
           </div>
         )}
 
         <div className="space-y-2">
-          <Label className="text-xs">Rechercher une ligne budgétaire</Label>
+          {/* Bascule : rattacher à UNE ligne ou à TOUT un regroupement */}
+          <div className="flex items-center rounded-md border overflow-hidden w-fit text-xs">
+            <button
+              type="button"
+              onClick={() => { setMode('ligne'); setSelectedGroupId(null); }}
+              className={cn('px-3 py-1.5 flex items-center gap-1.5', mode === 'ligne' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted')}
+            >
+              <Rows3 className="h-3.5 w-3.5" /> Une ligne
+            </button>
+            <button
+              type="button"
+              onClick={() => { setMode('groupe'); setSelectedId(null); }}
+              className={cn('px-3 py-1.5 flex items-center gap-1.5 border-l', mode === 'groupe' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted')}
+            >
+              <Boxes className="h-3.5 w-3.5" /> Un regroupement
+            </button>
+          </div>
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
             <Input
               autoFocus
-              placeholder="catégorie, description, fournisseur, nature…"
+              placeholder={mode === 'ligne' ? 'catégorie, description, fournisseur, nature…' : 'nom du regroupement…'}
               className="pl-8"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
           <ScrollArea className="h-72 border rounded-md">
-            {linesLoading ? (
-              <div className="flex items-center justify-center h-full py-10">
-                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-              </div>
-            ) : filtered.length === 0 ? (
-              <div className="py-10 text-center text-xs text-muted-foreground">
-                Aucune ligne budgétaire ne correspond.
-              </div>
+            {mode === 'ligne' ? (
+              linesLoading ? (
+                <div className="flex items-center justify-center h-full py-10">
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                </div>
+              ) : filtered.length === 0 ? (
+                <div className="py-10 text-center text-xs text-muted-foreground">
+                  Aucune ligne budgétaire ne correspond.
+                </div>
+              ) : (
+                <div className="divide-y">
+                  {filtered.map((l: any) => {
+                    const selected = selectedId === l.id;
+                    return (
+                      <button
+                        type="button"
+                        key={l.id}
+                        onClick={() => setSelectedId(l.id)}
+                        className={cn(
+                          'w-full text-left px-3 py-2 hover:bg-muted/50 transition-colors text-xs flex items-start gap-2',
+                          selected && 'bg-primary/10 hover:bg-primary/10',
+                        )}
+                      >
+                        <div className="flex-1 min-w-0 space-y-0.5">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4">
+                              {l.type_depense ?? '—'}
+                            </Badge>
+                            <Badge variant="secondary" className="text-[9px] px-1.5 py-0 h-4">
+                              {l.categorie ?? '—'}
+                              {l.sous_categorie ? ` / ${l.sous_categorie}` : ''}
+                            </Badge>
+                            {l.fournisseur_prevu && (
+                              <span className="font-mono text-[10px] text-muted-foreground">
+                                {l.fournisseur_prevu}
+                              </span>
+                            )}
+                          </div>
+                          <div className="truncate font-medium">
+                            {l.description ?? l.nature_depense ?? <span className="italic text-muted-foreground">Sans description</span>}
+                          </div>
+                        </div>
+                        <span className="tabular-nums font-semibold text-[11px] shrink-0">
+                          {eur(l.montant_budget_revise ?? l.montant_budget)}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )
             ) : (
-              <div className="divide-y">
-                {filtered.map((l: any) => {
-                  const selected = selectedId === l.id;
-                  return (
-                    <button
-                      type="button"
-                      key={l.id}
-                      onClick={() => setSelectedId(l.id)}
-                      className={cn(
-                        'w-full text-left px-3 py-2 hover:bg-muted/50 transition-colors text-xs flex items-start gap-2',
-                        selected && 'bg-primary/10 hover:bg-primary/10',
-                      )}
-                    >
-                      <div className="flex-1 min-w-0 space-y-0.5">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4">
-                            {l.type_depense ?? '—'}
-                          </Badge>
-                          <Badge variant="secondary" className="text-[9px] px-1.5 py-0 h-4">
-                            {l.categorie ?? '—'}
-                            {l.sous_categorie ? ` / ${l.sous_categorie}` : ''}
-                          </Badge>
-                          {l.fournisseur_prevu && (
-                            <span className="font-mono text-[10px] text-muted-foreground">
-                              {l.fournisseur_prevu}
-                            </span>
-                          )}
+              linesLoading ? (
+                <div className="flex items-center justify-center h-full py-10">
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                </div>
+              ) : groupList.length === 0 ? (
+                <div className="py-10 text-center text-xs text-muted-foreground">
+                  Aucun regroupement{search.trim() ? ' ne correspond' : ''}.
+                </div>
+              ) : (
+                <div className="divide-y">
+                  {groupList.map((g) => {
+                    const selected = selectedGroupId === g.id;
+                    return (
+                      <button
+                        type="button"
+                        key={g.id}
+                        onClick={() => setSelectedGroupId(g.id)}
+                        className={cn(
+                          'w-full text-left px-3 py-2 hover:bg-muted/50 transition-colors text-xs flex items-center gap-2',
+                          selected && 'bg-primary/10 hover:bg-primary/10',
+                        )}
+                      >
+                        <Boxes className="h-4 w-4 text-emerald-600 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <div className="truncate font-medium">{g.nom}</div>
+                          <div className="text-[10px] text-muted-foreground">
+                            {g.lineIds.length} ligne{g.lineIds.length > 1 ? 's' : ''}
+                          </div>
                         </div>
-                        <div className="truncate font-medium">
-                          {l.description ?? l.nature_depense ?? <span className="italic text-muted-foreground">Sans description</span>}
-                        </div>
-                      </div>
-                      <span className="tabular-nums font-semibold text-[11px] shrink-0">
-                        {eur(l.montant_budget_revise ?? l.montant_budget)}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
+                        <span className="tabular-nums font-semibold text-[11px] shrink-0">{eur(g.total)}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )
             )}
           </ScrollArea>
+          {mode === 'groupe' && (
+            <p className="text-[10px] text-muted-foreground">
+              L'écriture sera rattachée à <strong>toutes les lignes</strong> du regroupement et comptée <strong>une fois</strong> au niveau du groupe.
+            </p>
+          )}
         </div>
 
         <div className="space-y-1.5">
@@ -261,13 +368,15 @@ export function SupplierEntryLinkDialog({ entries, annee, entite, open, onOpenCh
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Annuler
           </Button>
-          <Button onClick={handleSubmit} disabled={!selectedId || linkMutation.isPending}>
-            {linkMutation.isPending ? (
+          <Button onClick={handleSubmit} disabled={!canSubmit || busy}>
+            {busy ? (
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
             ) : (
               <LinkIcon className="h-4 w-4 mr-2" />
             )}
-            {isMulti ? `Rattacher ${entries.length} écritures` : 'Rattacher'}
+            {mode === 'groupe'
+              ? `Rattacher au regroupement${isMulti ? ` (${entries.length})` : ''}`
+              : isMulti ? `Rattacher ${entries.length} écritures` : 'Rattacher'}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -219,6 +219,36 @@ export function useLinkSupplierEntries() {
   });
 }
 
+/**
+ * Rattache N écritures à PLUSIEURS lignes budgétaires (ex : toutes les lignes
+ * d'un regroupement) en un seul upsert (budgetLineIds × entryKeys).
+ */
+export function useLinkSupplierEntriesToLines() {
+  const qc = useQueryClient();
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: async (input: { budgetLineIds: string[]; entryKeys: string[]; note?: string }) => {
+      const rows: { budget_line_id: string; supplier_entry_key: string; linked_by: string | null; note: string | null }[] = [];
+      for (const lineId of input.budgetLineIds) {
+        for (const k of input.entryKeys) {
+          rows.push({ budget_line_id: lineId, supplier_entry_key: k, linked_by: user?.id ?? null, note: input.note ?? null });
+        }
+      }
+      if (rows.length === 0) return { inserted: 0, lines: 0, entries: 0 };
+      const { error } = await sb
+        .from('it_budget_line_supplier_entries')
+        .upsert(rows, { onConflict: 'budget_line_id,supplier_entry_key', ignoreDuplicates: true });
+      if (error) throw error;
+      return { inserted: rows.length, lines: input.budgetLineIds.length, entries: input.entryKeys.length };
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['supplier-entry-links'] });
+      qc.invalidateQueries({ queryKey: ['it-budget-line-supplier-entries'] });
+      qc.invalidateQueries({ queryKey: ['it-budget-line-supplier-entries-agg'] });
+    },
+  });
+}
+
 /** Détache une écriture (suppression du lien). */
 export function useUnlinkSupplierEntry() {
   const qc = useQueryClient();
