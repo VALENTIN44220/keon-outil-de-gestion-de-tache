@@ -11,10 +11,15 @@ import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { useITBudgetRapprochement } from '@/hooks/useITBudgetRapprochement';
 import type { DivaltoCommande, DivaltoFactureGrouped } from '@/hooks/useITBudgetRapprochement';
+import { useITBudgetLineSupplierEntries } from '@/hooks/useSupplierAccountingEntries';
 import { extractErrorMessage } from '@/lib/extractErrorMessage';
 
 const eur = (n: number | null | undefined) =>
   (n ?? 0).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
+
+// Écritures comptables : factures achats (A1/A2) uniquement, TTC → HT à TVA 20%.
+const FACTURE_JOURNALS = ['A1', 'A2'];
+const htEstime = (ttc: number | null | undefined) => Math.abs(ttc ?? 0) / 1.2;
 
 interface Props {
   budgetLineId: string | null;
@@ -36,6 +41,14 @@ export function BudgetLineRapprochementPanel({ budgetLineId, fournisseurPrevu }:
     engage,
     constate,
   } = useITBudgetRapprochement(budgetLineId, fournisseurPrevu);
+
+  // Écritures comptables rattachées (factures A1/A2) → à intégrer au constaté,
+  // au même titre que les factures Divalto (cohérent avec le canon global).
+  const { data: supplierLiens = [] } = useITBudgetLineSupplierEntries(budgetLineId);
+  const ecrituresHT = (supplierLiens as any[])
+    .filter((l) => FACTURE_JOURNALS.includes(l.supplier_accounting_entries?.journal))
+    .reduce((s, l) => s + htEstime(l.supplier_accounting_entries?.solde), 0);
+  const constateTotal = constate + ecrituresHT;
 
   if (!budgetLineId) {
     return (
@@ -93,8 +106,13 @@ export function BudgetLineRapprochementPanel({ budgetLineId, fournisseurPrevu }:
         <span className={cn('text-sm tabular-nums font-semibold', engage > 0 ? 'text-indigo-600' : 'text-muted-foreground')}>
           Engagé : {eur(engage)}
         </span>
-        <span className={cn('text-sm tabular-nums font-semibold', constate > 0 ? 'text-violet-600' : 'text-muted-foreground')}>
-          Constaté : {eur(constate)}
+        <span className={cn('text-sm tabular-nums font-semibold', constateTotal > 0 ? 'text-violet-600' : 'text-muted-foreground')}>
+          Constaté : {eur(constateTotal)}
+          {ecrituresHT > 0 && (
+            <span className="ml-1 text-[11px] font-normal text-muted-foreground">
+              (factures Divalto {eur(constate)} + écritures {eur(ecrituresHT)})
+            </span>
+          )}
         </span>
       </div>
     </div>

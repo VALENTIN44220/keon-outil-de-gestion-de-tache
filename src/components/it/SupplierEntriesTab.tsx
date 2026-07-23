@@ -82,6 +82,8 @@ export function SupplierEntriesTab({ annee, entite }: Props) {
   // ── Filters ─────────────────────────────────────────────────────────
   const [search, setSearch] = useState('');
   const [hasGescom, setHasGescom] = useState<'no' | 'yes' | 'all'>('no'); // défaut : sans Gescom
+  // Défaut : factures achats A1/A2 (on masque règlements BQ*, reports RAN/REP, OD).
+  const [journalMode, setJournalMode] = useState<'factures' | 'all'>('factures');
   const [dos, setDos] = useState<string>('100'); // défaut : DOS 100 (KEON)
   const [dateFrom, setDateFrom] = useState<string>('');
   const [dateTo, setDateTo] = useState<string>('');
@@ -95,6 +97,7 @@ export function SupplierEntriesTab({ annee, entite }: Props) {
   const filters: SupplierEntryFilters = useMemo(() => {
     const f: SupplierEntryFilters = { page, page_size: pageSize };
     if (hasGescom !== 'all') f.has_gescom_piece = hasGescom === 'yes';
+    if (journalMode === 'factures') f.journal_in = ['A1', 'A2'];
     if (dos) f.dos = dos;
     if (dateFrom) f.date_from = dateFrom;
     if (dateTo) f.date_to = dateTo;
@@ -106,7 +109,7 @@ export function SupplierEntriesTab({ annee, entite }: Props) {
     const max = parseFloat(amountMax.replace(',', '.'));
     if (!isNaN(max)) f.amount_max = max;
     return f;
-  }, [page, hasGescom, dos, dateFrom, dateTo, search, supplierCode, statusUser, amountMin, amountMax]);
+  }, [page, hasGescom, journalMode, dos, dateFrom, dateTo, search, supplierCode, statusUser, amountMin, amountMax]);
 
   const { data: result, isLoading } = useSupplierAccountingEntries(filters);
   const entries = result?.data ?? [];
@@ -163,6 +166,7 @@ export function SupplierEntriesTab({ annee, entite }: Props) {
   const resetFilters = () => {
     setSearch('');
     setHasGescom('no');
+    setJournalMode('factures');
     setDos('100'); // reset = retour au défaut DOS 100
     setDateFrom('');
     setDateTo('');
@@ -176,6 +180,7 @@ export function SupplierEntriesTab({ annee, entite }: Props) {
   const hasActiveFilter =
     !!search ||
     hasGescom !== 'no' ||
+    journalMode !== 'factures' ||
     dos !== '100' ||
     !!dateFrom ||
     !!dateTo ||
@@ -239,6 +244,16 @@ export function SupplierEntriesTab({ annee, entite }: Props) {
                 <SelectItem value="no">Sans pièce Gescom</SelectItem>
                 <SelectItem value="yes">Avec pièce Gescom</SelectItem>
                 <SelectItem value="all">Toutes</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={journalMode} onValueChange={(v) => { setJournalMode(v as any); setPage(0); }}>
+              <SelectTrigger className="w-[190px] h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="factures">Factures (A1/A2)</SelectItem>
+                <SelectItem value="all">Tous les journaux</SelectItem>
               </SelectContent>
             </Select>
 

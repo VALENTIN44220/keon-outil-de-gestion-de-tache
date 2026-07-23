@@ -61,6 +61,8 @@ export interface SupplierEntryFilters {
   supplier_search?: string;
   /** Strict : matche exactement supplier_code. Prioritaire sur supplier_search si défini. */
   supplier_code?: string;
+  /** Restreint aux journaux fournis (ex : ['A1','A2'] = factures achats uniquement). */
+  journal_in?: string[];
   amount_min?: number;
   amount_max?: number;
   status_user?: SupplierEntryStatus | '';
@@ -85,6 +87,8 @@ export function useSupplierAccountingEntries(filters: SupplierEntryFilters) {
 
       if (filters.has_gescom_piece !== undefined)
         q = q.eq('has_gescom_piece', filters.has_gescom_piece);
+      if (filters.journal_in && filters.journal_in.length > 0)
+        q = q.in('journal', filters.journal_in);
       if (filters.dos) q = q.eq('dos', filters.dos);
       if (filters.date_from) q = q.gte('date', filters.date_from);
       if (filters.date_to) q = q.lte('date', filters.date_to);

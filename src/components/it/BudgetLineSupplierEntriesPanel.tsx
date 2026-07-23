@@ -38,6 +38,13 @@ const TVA_STD = 0.20;
 const abs = (n: number | null | undefined): number => Math.abs(n ?? 0);
 const htEstime = (ttc: number | null | undefined): number => abs(ttc) / (1 + TVA_STD);
 
+/**
+ * Journaux de FACTURES achats. On exclut volontairement les règlements
+ * (banques BQ*, BNP…), les reports (RAN, REP) et les OD : seules les factures
+ * A1/A2 constituent une dépense « constatée ».
+ */
+const FACTURE_JOURNALS = ['A1', 'A2'];
+
 interface Props {
   budgetLineId: string | null;
   fournisseurPrevu: string | null;
@@ -58,6 +65,7 @@ export function BudgetLineSupplierEntriesPanel({ budgetLineId, fournisseurPrevu 
   const useStrict = !!fournisseurPrevu && searchTrim.toUpperCase() === fournisseurPrevu.toUpperCase();
   const { data: searchResult, isFetching: searching } = useSupplierAccountingEntries({
     has_gescom_piece: false,
+    journal_in: FACTURE_JOURNALS,
     supplier_code: useStrict ? fournisseurPrevu! : undefined,
     supplier_search: useStrict ? undefined : searchTrim || undefined,
     page: 0,
@@ -75,15 +83,21 @@ export function BudgetLineSupplierEntriesPanel({ budgetLineId, fournisseurPrevu 
     return new Set(liens.map((l: any) => l.supplier_entry_key));
   }, [liens]);
 
+  // On n'affiche/compte que les FACTURES (A1/A2) — pas les règlements/reports.
+  const liensFactures = useMemo(
+    () => (liens as any[]).filter((l) => FACTURE_JOURNALS.includes(l.supplier_accounting_entries?.journal)),
+    [liens],
+  );
+
   // Totaux consommation — somme des valeurs absolues (cf. abs helper)
   const totals = useMemo(() => {
     let ttc = 0;
-    for (const l of liens as any[]) {
+    for (const l of liensFactures) {
       const ent = l.supplier_accounting_entries;
       ttc += abs(ent?.solde);
     }
     return { ttc, ht: htEstime(ttc) };
-  }, [liens]);
+  }, [liensFactures]);
 
   if (!budgetLineId) {
     return (
@@ -182,13 +196,13 @@ export function BudgetLineSupplierEntriesPanel({ budgetLineId, fournisseurPrevu 
           <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
             <Loader2 className="h-3.5 w-3.5 animate-spin" /> Chargement…
           </div>
-        ) : liens.length === 0 ? (
+        ) : liensFactures.length === 0 ? (
           <div className="text-xs text-muted-foreground italic py-3 text-center border rounded-md bg-muted/20">
-            Aucune écriture rattachée pour cette ligne.
+            Aucune facture (A1/A2) rattachée pour cette ligne.
           </div>
         ) : (
           <div className="border rounded-md divide-y">
-            {(liens as any[]).map((l) => {
+            {liensFactures.map((l) => {
               const ent = l.supplier_accounting_entries;
               if (!ent) return null;
               return (
