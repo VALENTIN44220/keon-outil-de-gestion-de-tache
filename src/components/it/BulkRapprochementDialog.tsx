@@ -63,7 +63,7 @@ function groupFacturesByReference(rows: DivaltoFactureRaw[]): DivaltoFactureGrou
   const map = new Map<string, DivaltoFactureGrouped & { _htReel: number | null }>();
   for (const row of rows) {
     const key = (row.reference ?? '').trim();
-    if (!key) continue;
+    if (!key || key === '0') continue;
     let g = map.get(key);
     if (!g) {
       g = {
@@ -155,8 +155,13 @@ export function BulkRapprochementDialog({
         .from('divalto_mouvements_all')
         .select('numero_piece, tiers_code, nom_tiers, montant_ht, date_piece')
         .eq('doc_type', 'commande')
+        // Exclut les lignes sans n° de pièce (placeholder '0'/'') qui sinon
+        // saturent la fenêtre récente et masquent les vraies commandes.
+        .not('numero_piece', 'is', null)
+        .neq('numero_piece', '0')
+        .neq('numero_piece', '')
         .order('date_piece', { ascending: false })
-        .limit(100);   // 2× pour absorber doublons éventuels
+        .limit(200);
       if (q.trim()) req = req.ilike('numero_piece', `%${q.trim()}%`);
       const { data, error } = await req;
       if (error) throw error;
@@ -164,6 +169,8 @@ export function BulkRapprochementDialog({
       // Déduplique par numero_piece et mappe vers DivaltoCommande
       const seen = new Map<string, DivaltoCommande>();
       for (const d of data ?? []) {
+        const np = (d.numero_piece ?? '').trim();
+        if (np === '' || np === '0') continue;
         const existing = seen.get(d.numero_piece);
         if (!existing) {
           seen.set(d.numero_piece, {
@@ -193,8 +200,12 @@ export function BulkRapprochementDialog({
         .from('divalto_mouvements_all')
         .select('numero_piece, source, tiers_code, nom_tiers, libelle, montant_ht, date_piece')
         .eq('doc_type', 'facture')
+        // Exclut les lignes sans référence ('0'/'') qui saturent la fenêtre récente.
+        .not('numero_piece', 'is', null)
+        .neq('numero_piece', '0')
+        .neq('numero_piece', '')
         .order('date_piece', { ascending: false })
-        .limit(200);
+        .limit(400);
       if (q.trim()) req = req.ilike('numero_piece', `%${q.trim()}%`);
       const { data, error } = await req;
       if (error) throw error;
