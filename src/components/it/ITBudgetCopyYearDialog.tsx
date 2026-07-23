@@ -137,12 +137,23 @@ export function ITBudgetCopyYearDialog({ targetAnnee, open, onClose, onDone }: P
       if (groupIds.length > 0) {
         const { data: srcGroups } = await sb.from('it_budget_rapprochement_groups')
           .select('id, nom, description, entite').in('id', groupIds);
+        // Réutilise un groupe déjà présent sur l'année cible portant le même nom
+        // (évite les doublons quand on relance la copie).
+        const { data: existingGroups } = await sb.from('it_budget_rapprochement_groups')
+          .select('id, nom').eq('exercice', targetAnnee);
+        const existingByName = new Map<string, string>(
+          (existingGroups ?? []).map((g: any) => [(g.nom ?? '').trim().toLowerCase(), g.id]),
+        );
         for (const g of (srcGroups ?? [])) {
+          const key = (g.nom ?? '').trim().toLowerCase();
+          const reuseId = key ? existingByName.get(key) : undefined;
+          if (reuseId) { groupMap.set(g.id, reuseId); continue; }
           const { data: ins, error } = await sb.from('it_budget_rapprochement_groups')
             .insert({ nom: g.nom, description: g.description, entite: g.entite, exercice: targetAnnee })
             .select('id').single();
           if (error) throw error;
           groupMap.set(g.id, ins.id);
+          if (key) existingByName.set(key, ins.id);
         }
       }
       // 2) Construire les lignes copiées.

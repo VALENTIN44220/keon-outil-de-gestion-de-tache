@@ -1514,6 +1514,9 @@ export default function ITBudgetGlobal() {
           onDone={() => {
             queryClient.invalidateQueries({ queryKey: ['it-budget-global-lines'] });
             queryClient.invalidateQueries({ queryKey: ['it-budget-global-breakdown'] });
+            // Sans ça, les groupes fraîchement copiés ne sont pas dans le cache
+            // → labels génériques « Groupe <id> » au lieu de leur nom.
+            queryClient.invalidateQueries({ queryKey: ['it-budget-groups'] });
           }}
         />
 
