@@ -13,6 +13,7 @@ import { BudgetLineNdfPanel } from '@/components/it/BudgetLineNdfPanel';
 import { ITRHTab } from '@/components/it/ITRHTab';
 import { ITBudgetCopyYearDialog } from '@/components/it/ITBudgetCopyYearDialog';
 import { ITGroupRapprochementDialog, type GroupRapprochementInput } from '@/components/it/ITGroupRapprochementDialog';
+import { ITBudgetYearCompare } from '@/components/it/ITBudgetYearCompare';
 import { SupplierEntriesTab } from '@/components/it/SupplierEntriesTab';
 import { BudgetLineSupplierEntriesPanel } from '@/components/it/BudgetLineSupplierEntriesPanel';
 import { useITBudgetLineSupplierEntriesAgg } from '@/hooks/useSupplierAccountingEntries';
@@ -92,6 +93,7 @@ import {
   FileText,
   Boxes,
   Link2,
+  GitCompareArrows,
   X,
 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -471,7 +473,7 @@ export default function ITBudgetGlobal() {
     [prefs.filters_config, updateFilters]
   );
 
-  const [activeTab, setActiveTab] = useState<'synthese' | 'lignes' | 'depenses' | 'rh' | 'ecritures'>('synthese');
+  const [activeTab, setActiveTab] = useState<'synthese' | 'lignes' | 'depenses' | 'rh' | 'ecritures' | 'comparatif'>('synthese');
 
   // ── Sources canoniques : engage/constate (Divalto) + écritures comptables HT ──
   // Fetch AVANT useITBudgetGlobal pour pouvoir lui passer les maps et obtenir
@@ -1626,6 +1628,10 @@ export default function ITBudgetGlobal() {
                   <FileText className="h-4 w-4" />
                   Écritures fournisseurs
                 </TabsTrigger>
+                <TabsTrigger value="comparatif" className="gap-2">
+                  <GitCompareArrows className="h-4 w-4" />
+                  Comparatif annuel
+                </TabsTrigger>
               </TabsList>
 
               <TabsContent value="synthese" className="space-y-6 mt-4">
@@ -2594,6 +2600,10 @@ export default function ITBudgetGlobal() {
                   annee={Number(filters.annee) || new Date().getFullYear()}
                   entite={filters.entite || ''}
                 />
+              </TabsContent>
+
+              <TabsContent value="comparatif" className="space-y-4 mt-4">
+                <ITBudgetYearCompare />
               </TabsContent>
             </Tabs>
 
