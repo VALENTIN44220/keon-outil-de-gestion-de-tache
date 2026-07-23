@@ -137,13 +137,19 @@ export const IT_BUDGET_COLUMNS: ITBudgetColumnDef[] = [
     defaultVisible: true,
     align: 'right',
     render: (l, h) => {
+      // F n'affiche une valeur QUE si un reforecast est réellement saisi.
+      // Sinon la case reste vide (le reforecast se définit en cours d'année).
+      const hasReforecast = (l as any).montant_budget_revise != null;
+      if (!hasReforecast) {
+        return <span className="tabular-nums text-muted-foreground/50" title="Aucun reforecast saisi">—</span>;
+      }
       const initial = lineAnnualBudget(l);
       const revise = lineAnnualBudgetRevise(l);
       const isRevised = revise !== initial;
       return (
         <span
-          className={cn('tabular-nums', isRevised && 'font-semibold text-violet-700')}
-          title={isRevised ? `Reforecast appliqué (BUD ${h.eur(initial)} → F ${h.eur(revise)})` : 'F = BUD (aucun reforecast)'}
+          className={cn('tabular-nums font-semibold text-violet-700')}
+          title={`Reforecast appliqué (BUD ${h.eur(initial)} → F ${h.eur(revise)})`}
         >
           {h.eur(revise)}
         </span>

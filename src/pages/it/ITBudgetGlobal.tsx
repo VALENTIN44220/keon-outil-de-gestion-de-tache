@@ -277,10 +277,10 @@ function ExpandedMonths({ line }: { line: ITBudgetLine }) {
       if (idx >= 0 && idx < 12) init[idx].budget = initMontant;
     }
 
-    // ── Budget REFORECAST (F26) par mois ──
+    // ── Budget REFORECAST (F) par mois ──
     if (!hasRevise) {
-      // F26 = BUD26 : on recopie l'initial
-      for (let i = 0; i < 12; i++) init[i].revise = init[i].budget;
+      // Aucun reforecast saisi : colonne F laissée vide (0). Le reforecast se
+      // définit en cours d'année ; on ne recopie plus l'initial.
     } else {
       const rbt = (lx.budget_type_revise as string) || line.budget_type;
       const revMontant = line.montant_budget_revise;
