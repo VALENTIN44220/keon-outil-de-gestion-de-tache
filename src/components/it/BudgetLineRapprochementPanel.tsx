@@ -45,8 +45,18 @@ export function BudgetLineRapprochementPanel({ budgetLineId, fournisseurPrevu }:
   // Écritures comptables rattachées (factures A1/A2) → à intégrer au constaté,
   // au même titre que les factures Divalto (cohérent avec le canon global).
   const { data: supplierLiens = [] } = useITBudgetLineSupplierEntries(budgetLineId);
+  // Dédoublonnage : une écriture qui correspond à une facture Divalto déjà liée
+  // (même date + même montant HT) n'est PAS recomptée (même pièce).
+  const factureSigs = new Set(
+    facturesLieesGrouped.map((f) => `${f.date_facture ?? ''}|${Math.round(f.montant_ht ?? 0)}`),
+  );
   const ecrituresHT = (supplierLiens as any[])
     .filter((l) => FACTURE_JOURNALS.includes(l.supplier_accounting_entries?.journal))
+    .filter((l) => {
+      const ent = l.supplier_accounting_entries;
+      const sig = `${ent?.date ?? ''}|${Math.round(htEstime(ent?.solde))}`;
+      return !factureSigs.has(sig);
+    })
     .reduce((s, l) => s + htEstime(l.supplier_accounting_entries?.solde), 0);
   const constateTotal = constate + ecrituresHT;
 
